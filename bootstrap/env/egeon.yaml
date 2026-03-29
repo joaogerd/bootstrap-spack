@@ -1,0 +1,20 @@
+platform: cluster
+
+output:
+  directory: ./generated
+
+validation:
+  strict: true
+
+modules:
+  load:
+    - gnu9/9.4.0
+    - openmpi4/4.1.1
+  optional: []
+
+packages:
+  external:
+    - openmpi
+    - netcdf-c
+    - netcdf-fortran
+    - hdf5

@@ -1,0 +1,24 @@
+platform: cray
+
+modules:
+  load:
+    - PrgEnv-gnu
+    - cray-mpich
+
+  optional:
+    - cray-netcdf
+    - cray-hdf5
+    - esmf
+
+packages:
+  external:
+    - mpich
+    - netcdf-c
+    - hdf5
+    - esmf
+
+validation:
+  strict: true
+
+output:
+  directory: ./generated

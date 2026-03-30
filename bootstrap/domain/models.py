@@ -18,6 +18,28 @@ class PackageDefinition:
 
 
 @dataclass(frozen=True)
+class PackageNameResolution:
+    """Result of resolving a user/config-provided name against a registry.
+
+    status:
+      - 'canonical': requested name is already canonical (exists in registry keys)
+      - 'alias': requested name is a declared alias for exactly one canonical name
+      - 'ambiguous': requested name matches aliases from multiple packages
+      - 'unknown': requested name matches neither canonicals nor aliases
+    """
+
+    requested: str
+    normalized: str
+    canonical: Optional[str]
+    status: str
+    candidates: List[str] = field(default_factory=list)
+
+    @property
+    def resolved(self) -> bool:
+        return self.canonical is not None and self.status in {"canonical", "alias"}
+
+
+@dataclass(frozen=True)
 class ValidationResult:
     valid: bool
     reason: str
@@ -76,3 +98,4 @@ class BootstrapConfig:
     modules_to_load: List[str]
     modules_optional: List[str]
     external_packages: List[str]
+

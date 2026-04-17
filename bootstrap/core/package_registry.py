@@ -32,8 +32,6 @@ def _build_alias_index(
         canonical_norm = normalize_package_name(canonical_key)
         def_name_norm = normalize_package_name(definition.name)
 
-        # The architecture assumes canonical names are stable and consistent across
-        # layers: registry key == PackageDefinition.name == Spack package name.
         if canonical_norm != def_name_norm:
             raise ValueError(
                 f"inconsistent registry entry: key='{canonical_key}' != definition.name='{definition.name}'"
@@ -54,7 +52,6 @@ def _build_alias_index(
                 continue
 
             if existing != canonical_norm:
-                # Collision: this alias now refers to multiple canonicals.
                 ambiguous_aliases[alias_norm] = {existing, canonical_norm}
                 alias_to_canonical.pop(alias_norm, None)
 
@@ -63,8 +60,6 @@ def _build_alias_index(
 
 @dataclass(frozen=True)
 class PackageRegistryIndex:
-    """Read-only index providing name resolution for a package registry."""
-
     registry: Mapping[str, PackageDefinition]
     alias_to_canonical: Dict[str, str]
     ambiguous_aliases: Dict[str, Set[str]]
@@ -108,7 +103,6 @@ class PackageRegistryIndex:
 
 
 def build_package_registry_index(registry: Mapping[str, PackageDefinition]) -> PackageRegistryIndex:
-    """Create a resolution index for the provided registry mapping."""
     alias_to_canonical, ambiguous_aliases = _build_alias_index(registry)
     return PackageRegistryIndex(
         registry=registry,
@@ -121,7 +115,6 @@ def resolve_package_name(
     requested_name: str,
     registry: Mapping[str, PackageDefinition],
 ) -> PackageNameResolution:
-    """Convenience API: build an index and resolve a single name."""
     return build_package_registry_index(registry).resolve(requested_name)
 
 
@@ -142,7 +135,13 @@ PACKAGES: Dict[str, PackageDefinition] = {
     ),
     "netcdf-c": PackageDefinition(
         name="netcdf-c",
-        aliases=["netcdf-c", "netcdf"],
+        aliases=[
+            "netcdf-c",
+            "netcdf",
+            "cray-netcdf",
+            "cray-netcdf-hdf5parallel",
+            "cray-parallel-netcdf",
+        ],
         tools=["nc-config"],
         validation_type="netcdf-c",
         family="io",
@@ -151,7 +150,12 @@ PACKAGES: Dict[str, PackageDefinition] = {
     ),
     "netcdf-fortran": PackageDefinition(
         name="netcdf-fortran",
-        aliases=["netcdf-fortran"],
+        aliases=[
+            "netcdf-fortran",
+            "cray-netcdf",
+            "cray-netcdf-hdf5parallel",
+            "cray-parallel-netcdf",
+        ],
         tools=["nf-config"],
         validation_type="netcdf-fortran",
         family="io",
@@ -159,11 +163,10 @@ PACKAGES: Dict[str, PackageDefinition] = {
     ),
     "hdf5": PackageDefinition(
         name="hdf5",
-        aliases=["hdf5", "phdf5"],
+        aliases=["hdf5", "phdf5", "cray-hdf5", "cray-hdf5-parallel"],
         tools=["h5cc", "hp5cc"],
         validation_type="hdf5",
         family="io",
         parallel_optional=True,
     ),
 }
-

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, Optional
 
 from bootstrap.domain.models import NetcdfCValidationDetails, ValidationResult
 from bootstrap.infrastructure.validation.common import (
@@ -8,8 +8,17 @@ from bootstrap.infrastructure.validation.common import (
     infer_prefix_from_tool,
     normalize_version,
     run_cmd,
+    run_shell,
     select_c_compiler,
 )
+
+
+def _choose_netcdf_c_compiler(env: Dict[str, str], parallel: bool) -> Optional[str]:
+    if parallel:
+        res = run_shell("command -v mpicc", env)
+        if res.returncode == 0 and res.stdout.strip():
+            return "mpicc"
+    return select_c_compiler(env)
 
 
 def validate_netcdf_c(tool_paths: Dict[str, str], env: Dict[str, str], strict: bool) -> ValidationResult:
@@ -26,7 +35,7 @@ def validate_netcdf_c(tool_paths: Dict[str, str], env: Dict[str, str], strict: b
     has_parallel_text = " ".join([has_parallel_res.stdout or "", has_parallel_res.stderr or ""]).lower()
     parallel = "yes" in has_parallel_text
     prefix = prefix_res.stdout.strip() or infer_prefix_from_tool(nc_config)
-    compiler = select_c_compiler(env)
+    compiler = _choose_netcdf_c_compiler(env, parallel=parallel)
 
     compile_result = None
     if strict:

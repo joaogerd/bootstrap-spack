@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 import yaml
 
-from bootstrap.domain.models import BootstrapConfig, SiteConfig
+from bootstrap.domain.models import BootstrapConfig, SiteConfig, TemplateConfig
 from bootstrap.shared.exceptions import ConfigError
 
 
@@ -63,6 +63,24 @@ def _load_site_config(raw: Dict[str, Any]) -> SiteConfig:
     )
 
 
+def _load_template_config(raw: Dict[str, Any]) -> TemplateConfig:
+    template_name = _get(raw, ["template", "name"])
+    if template_name is not None and (not isinstance(template_name, str) or not template_name.strip()):
+        raise ConfigError("template.name must be a non-empty string when provided")
+
+    compiler = _get(raw, ["template", "compiler"])
+    if compiler is not None and (not isinstance(compiler, str) or not compiler.strip()):
+        raise ConfigError("template.compiler must be a non-empty string when provided")
+
+    specs = _require_list("template.specs", _get(raw, ["template", "specs"], []))
+
+    return TemplateConfig(
+        name=template_name.strip() if isinstance(template_name, str) else None,
+        specs=specs,
+        compiler=compiler.strip() if isinstance(compiler, str) else None,
+    )
+
+
 def load_config(path: str) -> BootstrapConfig:
     try:
         with open(path, "r", encoding="utf-8") as file:
@@ -104,4 +122,5 @@ def load_config(path: str) -> BootstrapConfig:
         modules_optional=modules_optional,
         external_packages=external_packages,
         site=_load_site_config(raw),
+        template=_load_template_config(raw),
     )

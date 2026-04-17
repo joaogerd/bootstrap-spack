@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Optional
 
 from bootstrap.application.build_specs import run_build_specs
@@ -9,10 +10,12 @@ from bootstrap.application.detect_packages import detect_requested_packages
 from bootstrap.application.inspect_linkage import run_linkage_inspection
 from bootstrap.core.package_registry import PACKAGES
 from bootstrap.domain.models import BootstrapResult, ExecutionContext
+from bootstrap.infrastructure.compiler.detector import detect_compiler_entry
 from bootstrap.infrastructure.env.config_loader import load_config
 from bootstrap.infrastructure.modules.module_system import load_base_modules
 from bootstrap.infrastructure.rendering.packages_yaml import generate_packages_yaml
 from bootstrap.infrastructure.rendering.report_writer import write_detection_report
+from bootstrap.infrastructure.rendering.site_tree import write_site_tree
 
 logger = logging.getLogger(__name__)
 
@@ -50,12 +53,12 @@ class BootstrapService:
         linkage = run_linkage_inspection(detected=detected, context=context)
         toolchain = run_toolchain_check(detected=detected, linkage=linkage)
         specs = run_build_specs(detected=detected, linkage=linkage)
+        packages_yaml = generate_packages_yaml(detected, specs)
 
         if not dry_run:
             logger.info("Writing packages.yaml to %s", output_yaml)
-            yaml_out = generate_packages_yaml(detected, specs)
             with open(output_yaml, "w", encoding="utf-8") as fh:
-                fh.write(yaml_out)
+                fh.write(packages_yaml)
 
             logger.info("Writing detection report to %s", output_report)
             write_detection_report(
@@ -67,6 +70,18 @@ class BootstrapService:
                 specs=specs,
                 toolchain=toolchain,
             )
+
+            if config.site.enabled:
+                compiler = detect_compiler_entry(base_env, list(config.modules_to_load))
+                site_root = str(Path(output_yaml).parent)
+                site_dir = write_site_tree(
+                    site_root,
+                    site=config.site,
+                    packages_yaml=packages_yaml,
+                    compiler=compiler,
+                )
+                if site_dir:
+                    logger.info("Wrote site files to %s", site_dir)
 
         if debug:
             logger.debug("Toolchain: %s", toolchain.reason)

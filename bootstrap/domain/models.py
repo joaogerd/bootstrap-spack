@@ -206,7 +206,8 @@ class ToolchainCheckResult:
 class ExecutionContext:
     base_env: Dict[str, str]
     loaded_modules: List[str]
-    strict_validation: bool
+    optional_modules: List[str] = field(default_factory=list)
+    strict_validation: bool = False
     platform: Optional[str] = None
 
 

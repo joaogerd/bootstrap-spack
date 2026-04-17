@@ -77,8 +77,10 @@ class BootstrapService:
                 site_dir = write_site_tree(
                     site_root,
                     site=config.site,
-                    packages_yaml=packages_yaml,
+                    template=config.template,
                     compiler=compiler,
+                    detected=detected,
+                    specs=specs,
                 )
                 if site_dir:
                     logger.info("Wrote site files to %s", site_dir)

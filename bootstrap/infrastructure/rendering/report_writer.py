@@ -44,15 +44,15 @@ def _write_packages(
         if requested_as:
             fh.write(f"  requested_as={requested_as}\n")
 
-        for key, value in pkg.metadata.items():
-            if key in {"requested_as", "compile"}:
-                continue
-            if value in (None, "", [], {}):
-                continue
-            fh.write(f"  {key}={value}\n")
-
         if pkg.validation and pkg.validation.details is not None:
             _write_details_block(fh, "detail_", pkg.validation.details)
+        else:
+            for key, value in pkg.metadata.items():
+                if key in {"requested_as", "compile"}:
+                    continue
+                if value in (None, "", [], {}):
+                    continue
+                fh.write(f"  {key}={value}\n")
 
         pkg_linkage = linkage.get(name)
         if pkg_linkage:

@@ -1,0 +1,22 @@
+platform: linux
+
+modules:
+  load: []
+  optional: []
+
+packages:
+  external:
+    - placeholder-local
+
+validation:
+  strict: false
+
+site:
+  name: linux-pc-site-only
+  layout: spack-stack
+  module_system: lmod
+  build_jobs: 4
+  core_compilers: []
+
+output:
+  directory: .

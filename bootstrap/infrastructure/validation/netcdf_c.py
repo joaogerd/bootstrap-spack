@@ -21,6 +21,27 @@ def _choose_netcdf_c_compiler(env: Dict[str, str], parallel: bool) -> Optional[s
     return select_c_compiler(env)
 
 
+def _normalize_netcdf_c_flags_and_libs(nc_config: str, env: Dict[str, str], cflags: str, libs: str) -> tuple[str, str]:
+    normalized_cflags = cflags.strip()
+    normalized_libs = libs.strip()
+
+    if normalized_cflags and normalized_libs:
+        return normalized_cflags, normalized_libs
+
+    include_res = run_cmd([nc_config, "--includedir"], env)
+    libdir_res = run_cmd([nc_config, "--libdir"], env)
+
+    includedir = include_res.stdout.strip()
+    libdir = libdir_res.stdout.strip()
+
+    if not normalized_cflags and includedir:
+        normalized_cflags = f"-I{includedir}"
+    if not normalized_libs and libdir:
+        normalized_libs = f"-L{libdir} -lnetcdf"
+
+    return normalized_cflags, normalized_libs
+
+
 def validate_netcdf_c(tool_paths: Dict[str, str], env: Dict[str, str], strict: bool) -> ValidationResult:
     nc_config = tool_paths.get("nc-config")
     if not nc_config:
@@ -36,6 +57,12 @@ def validate_netcdf_c(tool_paths: Dict[str, str], env: Dict[str, str], strict: b
     parallel = "yes" in has_parallel_text
     prefix = prefix_res.stdout.strip() or infer_prefix_from_tool(nc_config)
     compiler = _choose_netcdf_c_compiler(env, parallel=parallel)
+    normalized_cflags, normalized_libs = _normalize_netcdf_c_flags_and_libs(
+        nc_config,
+        env,
+        cflags_res.stdout,
+        libs_res.stdout,
+    )
 
     compile_result = None
     if strict:
@@ -47,8 +74,8 @@ def validate_netcdf_c(tool_paths: Dict[str, str], env: Dict[str, str], strict: b
                     prefix=prefix,
                     version_line=version_res.stdout.strip(),
                     version=normalize_version(version_res.stdout),
-                    cflags=cflags_res.stdout.strip(),
-                    libs=libs_res.stdout.strip(),
+                    cflags=normalized_cflags,
+                    libs=normalized_libs,
                     parallel=parallel,
                     compiler_used=None,
                     compile=None,
@@ -68,8 +95,8 @@ def validate_netcdf_c(tool_paths: Dict[str, str], env: Dict[str, str], strict: b
             compiler,
             code,
             env,
-            flags=cflags_res.stdout.strip(),
-            libs=libs_res.stdout.strip(),
+            flags=normalized_cflags,
+            libs=normalized_libs,
         )
 
         if not compile_result.ok:
@@ -80,8 +107,8 @@ def validate_netcdf_c(tool_paths: Dict[str, str], env: Dict[str, str], strict: b
                     prefix=prefix,
                     version_line=version_res.stdout.strip(),
                     version=normalize_version(version_res.stdout),
-                    cflags=cflags_res.stdout.strip(),
-                    libs=libs_res.stdout.strip(),
+                    cflags=normalized_cflags,
+                    libs=normalized_libs,
                     parallel=parallel,
                     compiler_used=compiler,
                     compile=compile_result,
@@ -95,8 +122,8 @@ def validate_netcdf_c(tool_paths: Dict[str, str], env: Dict[str, str], strict: b
             prefix=prefix,
             version_line=version_res.stdout.strip(),
             version=normalize_version(version_res.stdout),
-            cflags=cflags_res.stdout.strip(),
-            libs=libs_res.stdout.strip(),
+            cflags=normalized_cflags,
+            libs=normalized_libs,
             parallel=parallel,
             compiler_used=compiler,
             compile=compile_result,

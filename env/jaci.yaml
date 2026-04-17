@@ -1,0 +1,36 @@
+platform: cray
+
+modules:
+  load:
+    - PrgEnv-gnu
+    - cray-mpich
+  optional:
+    - cray-netcdf
+    - cray-hdf5
+
+packages:
+  external:
+    - mpich
+    - hdf5
+    - netcdf-c
+    - netcdf-fortran
+
+validation:
+  strict: true
+
+site:
+  name: jaci
+  layout: spack-stack
+  module_system: lmod
+  build_jobs: 8
+  core_compilers:
+    - gcc
+
+template:
+  name: mpas-bundle
+  specs:
+    - mpas-bundle
+  compiler: gcc
+
+output:
+  directory: .

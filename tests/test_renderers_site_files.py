@@ -1,6 +1,13 @@
 import yaml
 
-from bootstrap.domain.models import CompilerEntry, DetectedPackage, MpiValidationDetails, PackageSpec, ValidationResult
+from bootstrap.domain.models import (
+    CompilerEntry,
+    DetectedPackage,
+    MpiValidationDetails,
+    PackageSpec,
+    SiteRuntimeConfig,
+    ValidationResult,
+)
 from bootstrap.infrastructure.rendering.compilers_yaml import generate_compilers_yaml
 from bootstrap.infrastructure.rendering.config_yaml import generate_config_yaml
 from bootstrap.infrastructure.rendering.modules_yaml import (
@@ -91,7 +98,20 @@ def test_generate_template_spack_yaml_renders_specs_with_compiler() -> None:
     assert data["spack"]["view"] is False
 
 
-def test_generate_config_yaml_contains_build_jobs() -> None:
-    data = yaml.safe_load(generate_config_yaml(16))
+def test_generate_config_yaml_contains_detected_runtime_policy() -> None:
+    runtime = SiteRuntimeConfig(
+        build_jobs=8,
+        install_tree_root="/home/user/.spack-stack/egeon/opt/spack",
+        build_stage=["/scratch/user/spack-stack/egeon/stage"],
+        test_stage="/scratch/user/spack-stack/egeon/test",
+        source_cache="/home/user/.spack-stack/egeon/cache/source",
+        misc_cache="/home/user/.spack-stack/egeon/cache/misc",
+    )
+    data = yaml.safe_load(generate_config_yaml(runtime))
 
-    assert data == {"config": {"build_jobs": 16}}
+    assert data["config"]["build_jobs"] == 8
+    assert data["config"]["install_tree"]["root"] == "/home/user/.spack-stack/egeon/opt/spack"
+    assert data["config"]["build_stage"] == ["/scratch/user/spack-stack/egeon/stage"]
+    assert data["config"]["test_stage"] == "/scratch/user/spack-stack/egeon/test"
+    assert data["config"]["source_cache"] == "/home/user/.spack-stack/egeon/cache/source"
+    assert data["config"]["misc_cache"] == "/home/user/.spack-stack/egeon/cache/misc"

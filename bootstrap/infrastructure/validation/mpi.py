@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import os
 import re
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from bootstrap.domain.models import ExecutionContext, MpiValidationDetails, PackageDefinition, ValidationResult
 from bootstrap.infrastructure.validation.common import (
@@ -35,6 +36,32 @@ def _extract_version_from_text(text: str) -> Optional[str]:
     return match.group(1) if match else None
 
 
+def _run_prefix_local_version(prefix: Optional[str], env: Dict[str, str]) -> Tuple[str, str]:
+    if not prefix:
+        return "", ""
+
+    candidates = [
+        os.path.join(prefix, "bin", "mpirun"),
+        os.path.join(prefix, "bin", "mpiexec"),
+        os.path.join(prefix, "bin", "ompi_info"),
+    ]
+
+    for binary in candidates:
+        if not os.path.exists(binary):
+            continue
+
+        if os.path.basename(binary) == "ompi_info":
+            result = run_cmd([binary, "--version"], env)
+        else:
+            result = run_cmd([binary, "--version"], env)
+
+        text = (result.stdout or result.stderr or "").strip()
+        if result.returncode == 0 and text:
+            return text, binary
+
+    return "", ""
+
+
 def _extract_mpi_version(
     *,
     family: str,
@@ -43,10 +70,6 @@ def _extract_mpi_version(
     prefix: Optional[str],
     combined: str,
 ) -> Optional[str]:
-    version = _extract_version_from_text(family_version_text)
-    if version:
-        return version
-
     if family == "openmpi":
         if prefix:
             match = re.search(r"/(\d+\.\d+(?:\.\d+)?)(?:/|$)", prefix)
@@ -56,6 +79,10 @@ def _extract_mpi_version(
             match = re.search(r"openmpi[^\s/]*/(\d+\.\d+(?:\.\d+)?)", wrapper_show)
             if match:
                 return match.group(1)
+
+    version = _extract_version_from_text(family_version_text)
+    if version:
+        return version
 
     return normalize_version(combined)
 
@@ -70,9 +97,16 @@ def validate_mpi(
     if not mpi_wrapper:
         return ValidationResult(valid=False, reason="MPI compiler wrapper not found")
 
+    prefix = infer_prefix_from_tool(mpi_wrapper)
     version_res = run_cmd([mpi_wrapper, "--version"], env)
     family_show_res = run_cmd([mpi_wrapper, "-show"], env)
-    family_version_res = run_shell("mpirun --version || mpiexec --version || true", env)
+
+    prefix_version_text, _ = _run_prefix_local_version(prefix, env)
+    if prefix_version_text:
+        family_version_text = prefix_version_text
+    else:
+        family_version_res = run_shell("mpirun --version || mpiexec --version || true", env)
+        family_version_text = (family_version_res.stdout or family_version_res.stderr or "").strip()
 
     combined = " ".join(
         [
@@ -80,17 +114,15 @@ def validate_mpi(
             version_res.stderr or "",
             family_show_res.stdout or "",
             family_show_res.stderr or "",
-            family_version_res.stdout or "",
-            family_version_res.stderr or "",
+            family_version_text,
         ]
     )
 
     family = _infer_mpi_family(combined, context, mpi_wrapper)
-    prefix = infer_prefix_from_tool(mpi_wrapper)
-    version_line = safe_first_line(family_version_res.stdout or family_version_res.stderr) or safe_first_line(version_res.stdout or version_res.stderr)
+    version_line = safe_first_line(family_version_text) or safe_first_line(version_res.stdout or version_res.stderr)
     mpi_version = _extract_mpi_version(
         family=family,
-        family_version_text=(family_version_res.stdout or family_version_res.stderr or "").strip(),
+        family_version_text=family_version_text,
         wrapper_show=family_show_res.stdout.strip(),
         prefix=prefix,
         combined=combined,

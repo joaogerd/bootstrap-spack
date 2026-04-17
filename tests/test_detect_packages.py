@@ -35,11 +35,11 @@ def test_detect_requested_packages_annotates_requested_aliases(monkeypatch) -> N
 
     context = ExecutionContext(base_env={}, loaded_modules=[], strict_validation=False)
     detected = detect_requested_packages(
-        requested=["openmpi", "mpi"],
+        requested=["netcdf-c", "netcdf"],
         registry=PACKAGES,
         context=context,
     )
 
-    assert "openmpi" in detected
-    assert detected["openmpi"].found is True
-    assert detected["openmpi"].metadata["requested_as"] == ["openmpi", "mpi"]
+    assert "netcdf-c" in detected
+    assert detected["netcdf-c"].found is True
+    assert detected["netcdf-c"].metadata["requested_as"] == ["netcdf-c", "netcdf"]

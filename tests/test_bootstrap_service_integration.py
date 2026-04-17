@@ -5,6 +5,7 @@ from bootstrap.domain.models import (
     DetectedPackage,
     MpiValidationDetails,
     PackageSpec,
+    SiteRuntimeConfig,
     ToolchainCheckResult,
     ValidationResult,
 )
@@ -79,8 +80,16 @@ output:
         target="x86_64",
         modules=[],
     )
+    runtime = SiteRuntimeConfig(
+        build_jobs=8,
+        install_tree_root="/home/user/.spack-stack/linux-example/opt/spack",
+        build_stage=["/scratch/user/spack-stack/linux-example/stage"],
+        test_stage="/scratch/user/spack-stack/linux-example/test",
+        source_cache="/home/user/.spack-stack/linux-example/cache/source",
+        misc_cache="/home/user/.spack-stack/linux-example/cache/misc",
+    )
 
-    monkeypatch.setattr("bootstrap.services.bootstrap_service.load_base_modules", lambda modules: {"PATH": "/usr/bin"})
+    monkeypatch.setattr("bootstrap.services.bootstrap_service.load_base_modules", lambda modules: {"PATH": "/usr/bin", "HOME": "/home/user", "USER": "user"})
     monkeypatch.setattr("bootstrap.services.bootstrap_service.detect_requested_packages", lambda **kwargs: detected)
     monkeypatch.setattr("bootstrap.services.bootstrap_service.run_linkage_inspection", lambda **kwargs: {})
     monkeypatch.setattr(
@@ -89,6 +98,7 @@ output:
     )
     monkeypatch.setattr("bootstrap.services.bootstrap_service.run_build_specs", lambda **kwargs: specs)
     monkeypatch.setattr("bootstrap.services.bootstrap_service.detect_compiler_entry", lambda *args, **kwargs: compiler)
+    monkeypatch.setattr("bootstrap.services.bootstrap_service.detect_site_runtime_config", lambda *args, **kwargs: runtime)
 
     service = BootstrapService(str(config_file))
     out_dir = tmp_path / "out"
@@ -106,4 +116,9 @@ output:
     assert (out_dir / "configs" / "common" / "packages.yaml").exists()
     assert (out_dir / "configs" / "common" / "modules.yaml").exists()
     assert (out_dir / "configs" / "sites" / "linux-example" / "compilers.yaml").exists()
+    assert (out_dir / "configs" / "sites" / "linux-example" / "config.yaml").exists()
     assert (out_dir / "configs" / "templates" / "mpas-bundle" / "spack.yaml").exists()
+
+    config_text = (out_dir / "configs" / "sites" / "linux-example" / "config.yaml").read_text(encoding="utf-8")
+    assert "install_tree" in config_text
+    assert "/home/user/.spack-stack/linux-example/opt/spack" in config_text

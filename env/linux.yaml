@@ -1,0 +1,20 @@
+platform: linux
+
+modules:
+  load:
+    - gcc
+    - openmpi
+  optional: []
+
+packages:
+  external:
+    - openmpi
+    - hdf5
+    - netcdf-c
+    - netcdf-fortran
+
+validation:
+  strict: true
+
+output:
+  directory: .

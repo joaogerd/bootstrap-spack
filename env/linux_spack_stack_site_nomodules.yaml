@@ -1,0 +1,32 @@
+platform: linux
+
+modules:
+  load: []
+  optional: []
+
+packages:
+  external:
+    - openmpi
+    - hdf5
+    - netcdf-c
+    - netcdf-fortran
+
+validation:
+  strict: true
+
+site:
+  name: linux-example-nomodules
+  layout: spack-stack
+  module_system: lmod
+  build_jobs: 8
+  core_compilers:
+    - gcc@9.4.0
+
+template:
+  name: mpas-bundle
+  specs:
+    - mpas-bundle
+  compiler: gcc
+
+output:
+  directory: .

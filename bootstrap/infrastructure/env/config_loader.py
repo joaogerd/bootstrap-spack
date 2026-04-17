@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 import yaml
 
-from bootstrap.domain.models import BootstrapConfig, SiteConfig, TemplateConfig
+from bootstrap.domain.models import BootstrapConfig, SUPPORTED_SITE_LAYOUTS, SiteConfig, TemplateConfig
 from bootstrap.shared.exceptions import ConfigError
 
 
@@ -43,6 +43,9 @@ def _load_site_config(raw: Dict[str, Any]) -> SiteConfig:
     layout = _get(raw, ["site", "layout"], "spack-stack")
     if not isinstance(layout, str) or not layout.strip():
         raise ConfigError("site.layout must be a non-empty string")
+    layout = layout.strip()
+    if layout not in SUPPORTED_SITE_LAYOUTS:
+        raise ConfigError(f"site.layout must be one of {SUPPORTED_SITE_LAYOUTS}")
 
     module_system = _get(raw, ["site", "module_system"], "lmod")
     if not isinstance(module_system, str) or not module_system.strip():
@@ -56,7 +59,7 @@ def _load_site_config(raw: Dict[str, Any]) -> SiteConfig:
 
     return SiteConfig(
         name=site_name.strip() if isinstance(site_name, str) else None,
-        layout=layout.strip(),
+        layout=layout,
         module_system=module_system.strip(),
         build_jobs=build_jobs,
         core_compilers=core_compilers,
@@ -73,6 +76,8 @@ def _load_template_config(raw: Dict[str, Any]) -> TemplateConfig:
         raise ConfigError("template.compiler must be a non-empty string when provided")
 
     specs = _require_list("template.specs", _get(raw, ["template", "specs"], []))
+    if specs and template_name is None:
+        raise ConfigError("template.name is required when template.specs is provided")
 
     return TemplateConfig(
         name=template_name.strip() if isinstance(template_name, str) else None,

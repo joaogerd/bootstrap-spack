@@ -1,13 +1,67 @@
 from __future__ import annotations
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
-from bootstrap.domain.models import DetectedPackage, PackageLinkage, PackageSpec
+from bootstrap.domain.models import (
+    DetectedPackage,
+    Hdf5ValidationDetails,
+    MpiValidationDetails,
+    NetcdfCValidationDetails,
+    NetcdfFortranValidationDetails,
+    PackageLinkage,
+    PackageSpec,
+)
 from bootstrap.shared.exceptions import SpecBuildError
 
 
+def _details(pkg: DetectedPackage):
+    return pkg.validation.details if pkg.validation else None
+
+
+def _version(pkg: DetectedPackage) -> Optional[str]:
+    details = _details(pkg)
+    if details is not None and hasattr(details, "version"):
+        value = getattr(details, "version")
+        return value if isinstance(value, str) and value else None
+    value = pkg.metadata.get("version")
+    return value if isinstance(value, str) and value else None
+
+
+def _prefix(pkg: DetectedPackage) -> Optional[str]:
+    if pkg.prefix:
+        return pkg.prefix
+    details = _details(pkg)
+    if details is not None and hasattr(details, "prefix"):
+        value = getattr(details, "prefix")
+        return value if isinstance(value, str) and value else None
+    value = pkg.metadata.get("prefix")
+    return value if isinstance(value, str) and value else None
+
+
+def _mpi_family(pkg: DetectedPackage) -> str:
+    details = _details(pkg)
+    if isinstance(details, MpiValidationDetails):
+        return details.family.lower()
+    value = pkg.metadata.get("family")
+    return str(value).lower() if value is not None else ""
+
+
+def _hdf5_parallel(pkg: DetectedPackage) -> bool:
+    details = _details(pkg)
+    if isinstance(details, Hdf5ValidationDetails):
+        return details.parallel
+    return bool(pkg.metadata.get("parallel"))
+
+
+def _netcdf_c_parallel(pkg: DetectedPackage) -> bool:
+    details = _details(pkg)
+    if isinstance(details, NetcdfCValidationDetails):
+        return details.parallel
+    return bool(pkg.metadata.get("parallel"))
+
+
 def _base_spec(pkg: DetectedPackage) -> str:
-    version = pkg.metadata.get("version")
+    version = _version(pkg)
     spec = pkg.name
     if version:
         spec += f"@{version}"
@@ -15,22 +69,24 @@ def _base_spec(pkg: DetectedPackage) -> str:
 
 
 def _mpi_name_for_spec(pkg: DetectedPackage) -> str:
-    family = str(pkg.metadata.get("family", "")).lower()
+    family = _mpi_family(pkg)
     if pkg.name == "mpich" or family == "mpich":
         return "mpich"
     if pkg.name == "openmpi" or family == "openmpi":
         return "openmpi"
+    if family == "intelmpi":
+        return "intel-oneapi-mpi"
     return pkg.name
 
 
 def _mpi_dep_spec(pkg: DetectedPackage) -> str:
     name = _mpi_name_for_spec(pkg)
-    version = pkg.metadata.get("version")
+    version = _version(pkg)
     return name + (f"@{version}" if version else "")
 
 
 def _build_mpi_spec(pkg: DetectedPackage) -> Tuple[str, str, List[str]]:
-    family = str(pkg.metadata.get("family", "")).lower()
+    family = _mpi_family(pkg)
     confidence = "high" if family in {"openmpi", "mpich", "intelmpi"} else "medium"
     assumptions: List[str] = []
     if family not in {"openmpi", "mpich", "intelmpi"}:
@@ -46,7 +102,7 @@ def _build_hdf5_spec(
     assumptions: List[str] = []
     confidence = "high"
 
-    if pkg.metadata.get("parallel"):
+    if _hdf5_parallel(pkg):
         mpi_pkg = detected.get("openmpi") or detected.get("mpich") or detected.get("mpi")
         if mpi_pkg and mpi_pkg.found and mpi_pkg.validation and mpi_pkg.validation.valid:
             spec += f" ^{_mpi_dep_spec(mpi_pkg)}"
@@ -76,13 +132,13 @@ def _build_netcdf_c_spec(
 
     hdf5_pkg = detected.get("hdf5")
     if linkage.hdf5_prefix and hdf5_pkg and hdf5_pkg.found and hdf5_pkg.validation and hdf5_pkg.validation.valid:
-        hdf5_version = hdf5_pkg.metadata.get("version")
+        hdf5_version = _version(hdf5_pkg)
         hdf5_dep = "hdf5" + (f"@{hdf5_version}" if hdf5_version else "")
         spec += f" ^{hdf5_dep}"
         assumptions.append("HDF5 dependency inferred from dynamic linkage")
         confidence = "medium"
 
-    if pkg.metadata.get("parallel"):
+    if _netcdf_c_parallel(pkg):
         assumptions.append("NetCDF-C parallel capability inferred from nc-config")
         confidence = "medium"
 
@@ -100,11 +156,14 @@ def _build_netcdf_fortran_spec(
 
     ncc_pkg = detected.get("netcdf-c")
     if ncc_pkg and ncc_pkg.found and ncc_pkg.validation and ncc_pkg.validation.valid:
-        ncc_version = ncc_pkg.metadata.get("version")
+        ncc_version = _version(ncc_pkg)
         ncc_dep = "netcdf-c" + (f"@{ncc_version}" if ncc_version else "")
         spec += f" ^{ncc_dep}"
         assumptions.append("NetCDF-C dependency inferred from validated companion package")
         confidence = "medium"
+        if not linkage.netcdf_c_prefix:
+            assumptions.append("NetCDF-C dependency not confirmed via dynamic linkage")
+            confidence = "medium"
 
     mpi_pkg = detected.get("openmpi") or detected.get("mpich") or detected.get("mpi")
     if linkage.mpi_prefix and mpi_pkg and mpi_pkg.found and mpi_pkg.validation and mpi_pkg.validation.valid:
@@ -120,7 +179,7 @@ def _build_spec(
     linkage: PackageLinkage,
     detected: Dict[str, DetectedPackage],
 ) -> PackageSpec:
-    prefix = pkg.prefix or pkg.metadata.get("prefix")
+    prefix = _prefix(pkg)
     if not isinstance(prefix, str) or not prefix:
         raise SpecBuildError(f"package {pkg.name} has no prefix")
 

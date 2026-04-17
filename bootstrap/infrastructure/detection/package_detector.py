@@ -37,7 +37,7 @@ def _collect_tool_paths(tools: list[str], env: Dict[str, str]) -> Dict[str, str]
     return found
 
 
-def _collect_module_candidates(definition: PackageDefinition) -> list[str]:
+def _collect_module_candidates(definition: PackageDefinition, context: ExecutionContext) -> list[str]:
     names = [definition.name] + list(definition.aliases)
 
     candidates: list[str] = []
@@ -48,6 +48,11 @@ def _collect_module_candidates(definition: PackageDefinition) -> list[str]:
             if mod not in seen:
                 seen.add(mod)
                 candidates.append(mod)
+
+    for mod in context.optional_modules:
+        if mod not in seen:
+            seen.add(mod)
+            candidates.append(mod)
 
     return candidates
 
@@ -111,7 +116,7 @@ def detect_package(
                     validation=validation,
                 )
 
-        candidates = _collect_module_candidates(definition)
+        candidates = _collect_module_candidates(definition, context)
 
         for module_name in candidates:
             try:

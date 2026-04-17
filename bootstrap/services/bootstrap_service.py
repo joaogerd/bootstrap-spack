@@ -42,6 +42,7 @@ class BootstrapService:
         context = ExecutionContext(
             base_env=base_env,
             loaded_modules=list(config.modules_to_load),
+            optional_modules=list(config.modules_optional),
             strict_validation=strict,
             platform=config.platform,
         )

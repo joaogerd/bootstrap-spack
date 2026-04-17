@@ -34,12 +34,8 @@ def _infer_mpi_provider(detected: Dict[str, DetectedPackage]) -> Optional[str]:
     return None
 
 
-def generate_packages_yaml(
-    detected: Dict[str, DetectedPackage],
-    specs: Dict[str, PackageSpec],
-) -> str:
+def generate_common_packages_yaml(detected: Dict[str, DetectedPackage]) -> str:
     data: Dict[str, object] = {"packages": {}}
-
     mpi_provider = _infer_mpi_provider(detected)
     if mpi_provider:
         data["packages"]["all"] = {
@@ -47,6 +43,14 @@ def generate_packages_yaml(
                 "mpi": [mpi_provider],
             }
         }
+    return yaml.dump(data, sort_keys=False)
+
+
+def generate_site_packages_yaml(
+    detected: Dict[str, DetectedPackage],
+    specs: Dict[str, PackageSpec],
+) -> str:
+    data: Dict[str, object] = {"packages": {}}
 
     for name, pkg in detected.items():
         if pkg.found and pkg.validation and pkg.validation.valid and name in specs:
@@ -66,3 +70,16 @@ def generate_packages_yaml(
             }
 
     return yaml.dump(data, sort_keys=False)
+
+
+def generate_packages_yaml(
+    detected: Dict[str, DetectedPackage],
+    specs: Dict[str, PackageSpec],
+) -> str:
+    common = yaml.safe_load(generate_common_packages_yaml(detected))
+    site = yaml.safe_load(generate_site_packages_yaml(detected, specs))
+
+    payload: Dict[str, object] = {"packages": {}}
+    payload["packages"].update(common.get("packages", {}))
+    payload["packages"].update(site.get("packages", {}))
+    return yaml.dump(payload, sort_keys=False)

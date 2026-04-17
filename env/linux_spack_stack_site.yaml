@@ -24,5 +24,11 @@ site:
   core_compilers:
     - gcc@9.4.0
 
+template:
+  name: mpas-bundle
+  specs:
+    - mpas-bundle
+  compiler: gcc
+
 output:
   directory: .

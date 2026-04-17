@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 import yaml
 
-from bootstrap.domain.models import BootstrapConfig
+from bootstrap.domain.models import BootstrapConfig, SiteConfig
 from bootstrap.shared.exceptions import ConfigError
 
 
@@ -33,6 +33,34 @@ def _require_list(name: str, value: Any) -> list[str]:
         converted.append(item.strip())
 
     return converted
+
+
+def _load_site_config(raw: Dict[str, Any]) -> SiteConfig:
+    site_name = _get(raw, ["site", "name"])
+    if site_name is not None and (not isinstance(site_name, str) or not site_name.strip()):
+        raise ConfigError("site.name must be a non-empty string when provided")
+
+    layout = _get(raw, ["site", "layout"], "spack-stack")
+    if not isinstance(layout, str) or not layout.strip():
+        raise ConfigError("site.layout must be a non-empty string")
+
+    module_system = _get(raw, ["site", "module_system"], "lmod")
+    if not isinstance(module_system, str) or not module_system.strip():
+        raise ConfigError("site.module_system must be a non-empty string")
+
+    build_jobs = _get(raw, ["site", "build_jobs"], 8)
+    if not isinstance(build_jobs, int) or build_jobs <= 0:
+        raise ConfigError("site.build_jobs must be a positive integer")
+
+    core_compilers = _require_list("site.core_compilers", _get(raw, ["site", "core_compilers"], []))
+
+    return SiteConfig(
+        name=site_name.strip() if isinstance(site_name, str) else None,
+        layout=layout.strip(),
+        module_system=module_system.strip(),
+        build_jobs=build_jobs,
+        core_compilers=core_compilers,
+    )
 
 
 def load_config(path: str) -> BootstrapConfig:
@@ -75,4 +103,5 @@ def load_config(path: str) -> BootstrapConfig:
         modules_to_load=modules_to_load,
         modules_optional=modules_optional,
         external_packages=external_packages,
+        site=_load_site_config(raw),
     )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Dict, Optional
 import logging
 
@@ -26,13 +27,39 @@ def _infer_prefix(tool_path: Optional[str]) -> Optional[str]:
     return None
 
 
-def _collect_tool_paths(tools: list[str], env: Dict[str, str]) -> Dict[str, str]:
+def _prefix_hint_keys(definition: PackageDefinition) -> list[str]:
+    if definition.name == "hdf5":
+        return ["CRAY_HDF5_PREFIX", "HDF5_DIR", "HDF5_ROOT", "HDF5_PREFIX"]
+    if definition.name in {"netcdf-c", "netcdf-fortran"}:
+        return ["CRAY_NETCDF_PREFIX", "NETCDF_DIR", "NETCDF_ROOT", "NETCDF_PREFIX"]
+    return []
+
+
+def _collect_tool_paths(tools: list[str], env: Dict[str, str], definition: Optional[PackageDefinition] = None) -> Dict[str, str]:
     found: Dict[str, str] = {}
 
     for tool in tools:
         path = which_in_env(tool, env)
         if path:
             found[tool] = path
+
+    if definition is None:
+        return found
+
+    for key in _prefix_hint_keys(definition):
+        raw_prefix = env.get(key)
+        if not raw_prefix:
+            continue
+        prefix = raw_prefix.strip()
+        if not prefix:
+            continue
+        bin_dir = os.path.join(prefix, "bin")
+        for tool in tools:
+            if tool in found:
+                continue
+            candidate = os.path.join(bin_dir, tool)
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                found[tool] = candidate
 
     return found
 
@@ -45,6 +72,13 @@ def _collect_module_candidates(definition: PackageDefinition, context: Execution
 
     for name in names:
         for mod in module_avail(name):
+            if mod not in seen:
+                seen.add(mod)
+                candidates.append(mod)
+
+    for mod in context.optional_modules:
+        low = mod.lower()
+        if any(alias in low or definition.name in low for alias in definition.aliases + [definition.name]):
             if mod not in seen:
                 seen.add(mod)
                 candidates.append(mod)
@@ -87,7 +121,7 @@ def detect_package(
         base_env = sanitize_env(build_clean_env(context.base_env))
         logger.info("Detecting package %s", definition.name)
 
-        base_tool_paths = _collect_tool_paths(definition.tools, base_env)
+        base_tool_paths = _collect_tool_paths(definition.tools, base_env, definition)
 
         if base_tool_paths:
             base_prefix = next(
@@ -126,7 +160,7 @@ def detect_package(
                 continue
 
             candidate_env = sanitize_env(build_clean_env(module_env))
-            candidate_tool_paths = _collect_tool_paths(definition.tools, candidate_env)
+            candidate_tool_paths = _collect_tool_paths(definition.tools, candidate_env, definition)
 
             if not candidate_tool_paths:
                 continue

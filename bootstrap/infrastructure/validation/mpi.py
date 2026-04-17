@@ -50,11 +50,7 @@ def _run_prefix_local_version(prefix: Optional[str], env: Dict[str, str]) -> Tup
         if not os.path.exists(binary):
             continue
 
-        if os.path.basename(binary) == "ompi_info":
-            result = run_cmd([binary, "--version"], env)
-        else:
-            result = run_cmd([binary, "--version"], env)
-
+        result = run_cmd([binary, "--version"], env)
         text = (result.stdout or result.stderr or "").strip()
         if result.returncode == 0 and text:
             return text, binary
@@ -79,6 +75,11 @@ def _extract_mpi_version(
             match = re.search(r"openmpi[^\s/]*/(\d+\.\d+(?:\.\d+)?)", wrapper_show)
             if match:
                 return match.group(1)
+
+    if family == "mpich" and prefix:
+        match = re.search(r"/mpich/(\d+\.\d+(?:\.\d+)?)(?:/|$)", prefix)
+        if match:
+            return match.group(1)
 
     version = _extract_version_from_text(family_version_text)
     if version:

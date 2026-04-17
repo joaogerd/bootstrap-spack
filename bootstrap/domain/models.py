@@ -65,6 +65,31 @@ ValidationDetails = (
 
 
 @dataclass(frozen=True)
+class SiteConfig:
+    name: Optional[str] = None
+    layout: str = "spack-stack"
+    module_system: str = "lmod"
+    build_jobs: int = 8
+    core_compilers: List[str] = field(default_factory=list)
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.name)
+
+
+@dataclass(frozen=True)
+class CompilerEntry:
+    spec: str
+    cc: str
+    cxx: str
+    f77: str
+    fc: str
+    operating_system: str
+    target: str
+    modules: List[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class PackageDefinition:
     name: str
     aliases: List[str]
@@ -159,6 +184,7 @@ class BootstrapConfig:
     modules_to_load: List[str]
     modules_optional: List[str]
     external_packages: List[str]
+    site: SiteConfig = field(default_factory=SiteConfig)
 
 
 @dataclass(frozen=True)

@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Any, Dict, List, Optional
 
+SUPPORTED_SITE_LAYOUTS = ("spack-stack",)
+
 
 @dataclass(frozen=True)
 class CompileCheckDetails:
@@ -85,7 +87,7 @@ class TemplateConfig:
 
     @property
     def enabled(self) -> bool:
-        return bool(self.name)
+        return bool(self.name or self.specs)
 
 
 @dataclass(frozen=True)
@@ -98,6 +100,17 @@ class CompilerEntry:
     operating_system: str
     target: str
     modules: List[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class LayeredSpackStackArtifacts:
+    common_packages_yaml: str
+    common_modules_yaml: str
+    site_packages_yaml: str
+    site_compilers_yaml: str
+    site_modules_yaml: str
+    site_config_yaml: str
+    template_spack_yaml: Optional[str] = None
 
 
 @dataclass(frozen=True)

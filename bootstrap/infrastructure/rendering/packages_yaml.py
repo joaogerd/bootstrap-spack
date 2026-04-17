@@ -51,7 +51,7 @@ def generate_packages_yaml(
     for name, pkg in detected.items():
         if pkg.found and pkg.validation and pkg.validation.valid and name in specs:
             spec = specs[name]
-            package_entry = {
+            data["packages"][name] = {
                 "externals": [
                     {
                         "spec": spec.spec,
@@ -60,11 +60,6 @@ def generate_packages_yaml(
                 ],
                 "buildable": False,
             }
-
-            if pkg.validation.reason:
-                package_entry["detection"] = pkg.validation.reason
-
-            data["packages"][name] = package_entry
         else:
             data["packages"][name] = {
                 "buildable": True,

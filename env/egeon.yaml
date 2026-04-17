@@ -1,0 +1,34 @@
+platform: cluster
+
+modules:
+  load:
+    - gnu9/9.4.0
+    - openmpi4/4.1.1
+  optional: []
+
+packages:
+  external:
+    - openmpi
+    - hdf5
+    - netcdf-c
+    - netcdf-fortran
+
+validation:
+  strict: true
+
+site:
+  name: egeon
+  layout: spack-stack
+  module_system: lmod
+  build_jobs: 8
+  core_compilers:
+    - gcc@9.4.0
+
+template:
+  name: mpas-bundle
+  specs:
+    - mpas-bundle
+  compiler: gcc
+
+output:
+  directory: .

@@ -38,6 +38,12 @@ def build_clean_env(base_env: Optional[Dict[str, str]] = None) -> Dict[str, str]
         if value is not None:
             clean[key] = value
 
+    for key, value in source.items():
+        if value is None:
+            continue
+        if key.startswith(("CRAY_", "PE_", "NETCDF_", "HDF5_")):
+            clean[key] = value
+
     if "PATH" not in clean:
         clean["PATH"] = os.environ.get("PATH", "")
 

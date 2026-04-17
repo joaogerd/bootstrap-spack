@@ -1,9 +1,7 @@
 platform: linux
 
 modules:
-  load:
-    - gcc
-    - openmpi
+  load: []
   optional: []
 
 packages:

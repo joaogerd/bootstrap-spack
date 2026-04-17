@@ -1,0 +1,25 @@
+platform: linux
+
+modules:
+  load: []
+  optional: []
+
+packages:
+  external:
+    - openmpi
+    - hdf5
+    - netcdf-c
+    - netcdf-fortran
+
+validation:
+  strict: false
+
+site:
+  name: linux-pc
+  layout: spack-stack
+  module_system: lmod
+  build_jobs: 4
+  core_compilers: []
+
+output:
+  directory: .

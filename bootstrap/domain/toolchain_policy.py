@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Set
 
-from bootstrap.domain.models import DetectedPackage, PackageLinkage, ToolchainCheckResult
+from bootstrap.domain.models import (
+    DetectedPackage,
+    Hdf5ValidationDetails,
+    MpiValidationDetails,
+    NetcdfCValidationDetails,
+    NetcdfFortranValidationDetails,
+    PackageLinkage,
+    ToolchainCheckResult,
+)
 
 
 def _get_pkg(packages: List[DetectedPackage], name: str) -> Optional[DetectedPackage]:
@@ -22,15 +30,55 @@ def _valid(pkg: Optional[DetectedPackage]) -> bool:
     return pkg.validation.valid
 
 
-def _infer_toolchain_tokens(*prefixes: Optional[str]) -> List[str]:
+def _details(pkg: Optional[DetectedPackage]):
+    if not pkg or not pkg.validation:
+        return None
+    return pkg.validation.details
+
+
+def _prefix_from_pkg(pkg: Optional[DetectedPackage]) -> Optional[str]:
+    if not pkg:
+        return None
+    if pkg.prefix:
+        return pkg.prefix
+    details = _details(pkg)
+    if details is not None and hasattr(details, "prefix"):
+        value = getattr(details, "prefix")
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _parallel_netcdf_c(pkg: Optional[DetectedPackage]) -> bool:
+    details = _details(pkg)
+    return isinstance(details, NetcdfCValidationDetails) and details.parallel
+
+
+def _parallel_hdf5(pkg: Optional[DetectedPackage]) -> bool:
+    details = _details(pkg)
+    return isinstance(details, Hdf5ValidationDetails) and details.parallel
+
+
+def _mpi_family(pkg: Optional[DetectedPackage]) -> Optional[str]:
+    details = _details(pkg)
+    if isinstance(details, MpiValidationDetails):
+        return details.family
+    return None
+
+
+def _infer_toolchain_tokens(*prefixes: Optional[str], mpi_family: Optional[str] = None) -> List[str]:
     tokens: Set[str] = set()
+
+    if mpi_family:
+        low_family = mpi_family.lower()
+        if low_family in {"openmpi", "mpich", "intelmpi"}:
+            tokens.add(low_family)
 
     for prefix in prefixes:
         if not prefix:
             continue
 
         low = prefix.lower()
-
         for token in ["gnu", "gcc", "openmpi", "mpich", "intel", "oneapi", "cray"]:
             if token in low:
                 tokens.add(token)
@@ -55,25 +103,23 @@ def check_toolchain(
     ncc_valid = _valid(ncc)
     ncf_valid = _valid(ncf)
 
-    mpi_prefix = mpi.prefix if mpi else None
-    hdf5_prefix = hdf5.prefix if hdf5 else None
-    ncc_prefix = ncc.prefix if ncc else None
-    ncf_prefix = ncf.prefix if ncf else None
+    mpi_prefix = _prefix_from_pkg(mpi)
+    hdf5_prefix = _prefix_from_pkg(hdf5)
+    ncc_prefix = _prefix_from_pkg(ncc)
+    ncf_prefix = _prefix_from_pkg(ncf)
 
     tokens = _infer_toolchain_tokens(
         mpi_prefix,
         hdf5_prefix,
         ncc_prefix,
         ncf_prefix,
+        mpi_family=_mpi_family(mpi),
     )
 
-    ncc_meta = ncc.metadata if ncc else {}
-    hdf5_meta = hdf5.metadata if hdf5 else {}
-
-    if ncc_valid and ncc_meta.get("parallel") and not mpi_valid:
+    if ncc_valid and _parallel_netcdf_c(ncc) and not mpi_valid:
         problems.append("NetCDF-C parallel sem MPI válido")
 
-    if hdf5_valid and hdf5_meta.get("parallel") and not mpi_valid:
+    if hdf5_valid and _parallel_hdf5(hdf5) and not mpi_valid:
         warnings.append("HDF5 paralelo sem MPI válido")
 
     if ncf_valid and not ncc_valid:

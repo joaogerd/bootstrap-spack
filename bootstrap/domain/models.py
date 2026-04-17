@@ -61,7 +61,6 @@ ValidationDetails = (
     | Hdf5ValidationDetails
     | NetcdfCValidationDetails
     | NetcdfFortranValidationDetails
-    | CompileCheckDetails
 )
 
 

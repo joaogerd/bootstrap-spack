@@ -56,7 +56,11 @@ def load_base_modules(modules: List[str]) -> Dict[str, str]:
         logger.info("No base modules requested; using current sanitized environment")
         return sanitize_env(build_clean_env())
 
-    parent_env = build_clean_env(dict(os.environ))
+    # Module systems on HPC platforms may depend on site-specific environment
+    # variables beyond our sanitized whitelist. Preserve the full parent shell
+    # environment for module operations and sanitize only after capturing the
+    # loaded environment.
+    parent_env = dict(os.environ)
 
     if not _module_support_available(parent_env):
         raise ModuleSystemError(
@@ -77,7 +81,7 @@ def load_base_modules(modules: List[str]) -> Dict[str, str]:
 
 def module_load(module_name: str, *, base_modules: List[str] | None = None) -> Dict[str, str]:
     modules = list(base_modules or []) + [module_name]
-    parent_env = build_clean_env(dict(os.environ))
+    parent_env = dict(os.environ)
 
     if not _module_support_available(parent_env):
         raise ModuleSystemError(
@@ -97,7 +101,7 @@ def module_load(module_name: str, *, base_modules: List[str] | None = None) -> D
 
 
 def module_avail(pattern: str = "") -> List[str]:
-    parent_env = build_clean_env(dict(os.environ))
+    parent_env = dict(os.environ)
 
     if not _module_support_available(parent_env):
         return []

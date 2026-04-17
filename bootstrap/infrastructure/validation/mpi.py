@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Dict, List
+import re
+from typing import Dict, List, Optional
 
 from bootstrap.domain.models import ExecutionContext, MpiValidationDetails, PackageDefinition, ValidationResult
 from bootstrap.infrastructure.validation.common import (
@@ -27,6 +28,36 @@ def _infer_mpi_family(combined: str, context: ExecutionContext, compiler_path: s
     if context.platform == "cray" and compiler_path and compiler_path.endswith("/cc"):
         return "mpich"
     return "unknown"
+
+
+def _extract_version_from_text(text: str) -> Optional[str]:
+    match = re.search(r"(\d+\.\d+(?:\.\d+)?)", text)
+    return match.group(1) if match else None
+
+
+def _extract_mpi_version(
+    *,
+    family: str,
+    family_version_text: str,
+    wrapper_show: str,
+    prefix: Optional[str],
+    combined: str,
+) -> Optional[str]:
+    version = _extract_version_from_text(family_version_text)
+    if version:
+        return version
+
+    if family == "openmpi":
+        if prefix:
+            match = re.search(r"/(\d+\.\d+(?:\.\d+)?)(?:/|$)", prefix)
+            if match:
+                return match.group(1)
+        if wrapper_show:
+            match = re.search(r"openmpi[^\s/]*/(\d+\.\d+(?:\.\d+)?)", wrapper_show)
+            if match:
+                return match.group(1)
+
+    return normalize_version(combined)
 
 
 def validate_mpi(
@@ -56,7 +87,14 @@ def validate_mpi(
 
     family = _infer_mpi_family(combined, context, mpi_wrapper)
     prefix = infer_prefix_from_tool(mpi_wrapper)
-    version_line = safe_first_line(version_res.stdout or version_res.stderr)
+    version_line = safe_first_line(family_version_res.stdout or family_version_res.stderr) or safe_first_line(version_res.stdout or version_res.stderr)
+    mpi_version = _extract_mpi_version(
+        family=family,
+        family_version_text=(family_version_res.stdout or family_version_res.stderr or "").strip(),
+        wrapper_show=family_show_res.stdout.strip(),
+        prefix=prefix,
+        combined=combined,
+    )
     warnings: List[str] = []
 
     compile_result = None
@@ -77,7 +115,7 @@ def validate_mpi(
                 details=MpiValidationDetails(
                     prefix=prefix,
                     family=family,
-                    version=normalize_version(combined),
+                    version=mpi_version,
                     version_line=version_line,
                     mpi_wrapper=mpi_wrapper,
                     wrapper_show=family_show_res.stdout.strip(),
@@ -95,7 +133,7 @@ def validate_mpi(
         details=MpiValidationDetails(
             prefix=prefix,
             family=family,
-            version=normalize_version(combined),
+            version=mpi_version,
             version_line=version_line,
             mpi_wrapper=mpi_wrapper,
             wrapper_show=family_show_res.stdout.strip(),

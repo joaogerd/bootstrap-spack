@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import shlex
 import subprocess
+import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
@@ -13,6 +15,9 @@ class CommandResult:
     returncode: int
     stdout: str
     stderr: str
+    command: str
+    timed_out: bool
+    duration_seconds: float
 
 
 class CommandRunner:
@@ -25,6 +30,8 @@ class CommandRunner:
         *,
         env: Optional[Dict[str, str]] = None,
     ) -> CommandResult:
+        command = " ".join(shlex.quote(part) for part in args)
+        started = time.monotonic()
         try:
             result = subprocess.run(
                 args,
@@ -34,16 +41,24 @@ class CommandRunner:
                 timeout=self.policy.timeout_seconds,
                 check=False,
             )
+            duration = time.monotonic() - started
             return CommandResult(
                 returncode=result.returncode,
                 stdout=result.stdout,
                 stderr=result.stderr,
+                command=command,
+                timed_out=False,
+                duration_seconds=duration,
             )
         except subprocess.TimeoutExpired as exc:
+            duration = time.monotonic() - started
             return CommandResult(
                 returncode=124,
                 stdout=exc.stdout or "",
                 stderr=(exc.stderr or "") + ("\n" if exc.stderr else "") + "timeout",
+                command=command,
+                timed_out=True,
+                duration_seconds=duration,
             )
 
     def run(

@@ -8,6 +8,7 @@ from bootstrap.domain.models import (
     MpiValidationDetails,
     PackageSpec,
     SiteConfig,
+    SiteRuntimeConfig,
     TemplateConfig,
     ValidationResult,
 )
@@ -24,6 +25,14 @@ def test_write_site_tree_creates_layered_spack_stack_layout(tmp_path: Path) -> N
         operating_system="rhel8",
         target="x86_64",
         modules=["gnu9/9.4.0"],
+    )
+    runtime = SiteRuntimeConfig(
+        build_jobs=8,
+        install_tree_root="/home/user/.spack-stack/linux-example/opt/spack",
+        build_stage=["/scratch/user/spack-stack/linux-example/stage"],
+        test_stage="/scratch/user/spack-stack/linux-example/test",
+        source_cache="/home/user/.spack-stack/linux-example/cache/source",
+        misc_cache="/home/user/.spack-stack/linux-example/cache/misc",
     )
     site = SiteConfig(
         name="linux-example",
@@ -69,6 +78,7 @@ def test_write_site_tree_creates_layered_spack_stack_layout(tmp_path: Path) -> N
         site=site,
         template=template,
         compiler=compiler,
+        runtime_config=runtime,
         detected=detected,
         specs=specs,
     )
@@ -101,6 +111,9 @@ def test_write_site_tree_creates_layered_spack_stack_layout(tmp_path: Path) -> N
 
     config_data = yaml.safe_load((site_root / "config.yaml").read_text(encoding="utf-8"))
     assert config_data["config"]["build_jobs"] == 8
+    assert config_data["config"]["install_tree"]["root"] == "/home/user/.spack-stack/linux-example/opt/spack"
+    assert config_data["config"]["build_stage"] == ["/scratch/user/spack-stack/linux-example/stage"]
+    assert config_data["config"]["test_stage"] == "/scratch/user/spack-stack/linux-example/test"
 
     template_data = yaml.safe_load((template_root / "spack.yaml").read_text(encoding="utf-8"))
     assert template_data["spack"]["specs"] == ["mpas-bundle %gcc"]

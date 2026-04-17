@@ -4,6 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from bootstrap.interfaces.presenters.console import render_console
 from bootstrap.services.bootstrap_service import BootstrapService
 from bootstrap.shared.exceptions import BootstrapError
 from bootstrap.shared.logging import configure_logging
@@ -78,20 +79,4 @@ def main() -> None:
             raise
         sys.exit(2)
 
-    print("\n=== DETECTION ===")
-    for name, pkg in result["detected"].items():
-        status = "OK" if pkg.found else "FAIL"
-        reason = pkg.validation.reason if pkg.validation else ""
-        print(f"{status:5} {name:20} {pkg.prefix or '-'} {reason}")
-
-    print("\n=== TOOLCHAIN ===")
-    print(result["toolchain"].reason)
-
-    print("\n=== SPECS ===")
-    for spec in result["specs"].values():
-        print(f"{spec.package}: {spec.spec} [{spec.prefix}]")
-
-    if not args.dry_run:
-        print("\n=== OUTPUTS ===")
-        print(f"report: {result['output_report']}")
-        print(f"packages_yaml: {result['output_yaml']}")
+    print(render_console(result), end="")

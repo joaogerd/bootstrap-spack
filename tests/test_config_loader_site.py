@@ -1,6 +1,9 @@
 from pathlib import Path
 
+import pytest
+
 from bootstrap.infrastructure.env.config_loader import load_config
+from bootstrap.shared.exceptions import ConfigError
 
 
 def test_load_config_parses_site_and_template_sections(tmp_path: Path) -> None:
@@ -48,3 +51,51 @@ output:
     assert cfg.template.specs == ["mpas-bundle"]
     assert cfg.template.compiler == "gcc"
     assert cfg.template.enabled is True
+
+
+def test_load_config_rejects_unsupported_site_layout(tmp_path: Path) -> None:
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(
+        """
+platform: linux
+modules:
+  load: []
+packages:
+  external:
+    - openmpi
+site:
+  name: linux-example
+  layout: generic
+output:
+  directory: .
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigError, match="site.layout"):
+        load_config(str(config_file))
+
+
+def test_load_config_requires_template_name_when_specs_are_present(tmp_path: Path) -> None:
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(
+        """
+platform: linux
+modules:
+  load: []
+packages:
+  external:
+    - openmpi
+template:
+  specs:
+    - mpas-bundle
+output:
+  directory: .
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigError, match="template.name"):
+        load_config(str(config_file))

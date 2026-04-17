@@ -78,6 +78,17 @@ class SiteConfig:
 
 
 @dataclass(frozen=True)
+class TemplateConfig:
+    name: Optional[str] = None
+    specs: List[str] = field(default_factory=list)
+    compiler: Optional[str] = None
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.name)
+
+
+@dataclass(frozen=True)
 class CompilerEntry:
     spec: str
     cc: str
@@ -185,6 +196,7 @@ class BootstrapConfig:
     modules_optional: List[str]
     external_packages: List[str]
     site: SiteConfig = field(default_factory=SiteConfig)
+    template: TemplateConfig = field(default_factory=TemplateConfig)
 
 
 @dataclass(frozen=True)

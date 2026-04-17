@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Optional
 
 from bootstrap.domain.models import (
     CompilerEntry,
     LayeredSpackStackArtifacts,
     SiteConfig,
+    SiteRuntimeConfig,
     TemplateConfig,
 )
 from bootstrap.infrastructure.rendering.compilers_yaml import generate_compilers_yaml
@@ -27,6 +28,7 @@ def build_spack_stack_artifacts(
     site: SiteConfig,
     template: TemplateConfig,
     compiler: CompilerEntry,
+    runtime_config: SiteRuntimeConfig,
     detected,
     specs,
 ) -> LayeredSpackStackArtifacts:
@@ -41,7 +43,7 @@ def build_spack_stack_artifacts(
         site_packages_yaml=generate_site_packages_yaml(detected, specs),
         site_compilers_yaml=generate_compilers_yaml([compiler]),
         site_modules_yaml=generate_site_modules_yaml(site.module_system, core_compilers),
-        site_config_yaml=generate_config_yaml(site.build_jobs),
+        site_config_yaml=generate_config_yaml(runtime_config),
         template_spack_yaml=template_spack_yaml,
     )
 
@@ -87,6 +89,7 @@ def write_site_tree(
     site: SiteConfig,
     template: TemplateConfig,
     compiler: CompilerEntry,
+    runtime_config: SiteRuntimeConfig,
     detected,
     specs,
 ) -> Optional[str]:
@@ -97,6 +100,7 @@ def write_site_tree(
         site=site,
         template=template,
         compiler=compiler,
+        runtime_config=runtime_config,
         detected=detected,
         specs=specs,
     )

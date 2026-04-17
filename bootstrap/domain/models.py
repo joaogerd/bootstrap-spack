@@ -1,7 +1,68 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from dataclasses import asdict, dataclass, field, is_dataclass
+from typing import Any, Dict, List, Optional
+
+
+@dataclass(frozen=True)
+class CompileCheckDetails:
+    ok: bool
+    cmd: str
+    stdout: str
+    stderr: str
+
+
+@dataclass(frozen=True)
+class MpiValidationDetails:
+    prefix: Optional[str]
+    family: str
+    version: Optional[str]
+    version_line: str
+    mpi_wrapper: Optional[str]
+    wrapper_show: str
+    compile: Optional[CompileCheckDetails] = None
+
+
+@dataclass(frozen=True)
+class Hdf5ValidationDetails:
+    prefix: Optional[str]
+    parallel: bool
+    show: str
+    config_head: str
+    version: Optional[str]
+    compile: Optional[CompileCheckDetails] = None
+
+
+@dataclass(frozen=True)
+class NetcdfCValidationDetails:
+    prefix: Optional[str]
+    version_line: str
+    version: Optional[str]
+    cflags: str
+    libs: str
+    parallel: bool
+    compiler_used: Optional[str]
+    compile: Optional[CompileCheckDetails] = None
+
+
+@dataclass(frozen=True)
+class NetcdfFortranValidationDetails:
+    prefix: Optional[str]
+    version_line: str
+    version: Optional[str]
+    fflags: str
+    flibs: str
+    fc_used: Optional[str]
+    compile: Optional[CompileCheckDetails] = None
+
+
+ValidationDetails = (
+    MpiValidationDetails
+    | Hdf5ValidationDetails
+    | NetcdfCValidationDetails
+    | NetcdfFortranValidationDetails
+    | CompileCheckDetails
+)
 
 
 @dataclass(frozen=True)
@@ -19,15 +80,6 @@ class PackageDefinition:
 
 @dataclass(frozen=True)
 class PackageNameResolution:
-    """Result of resolving a user/config-provided name against a registry.
-
-    status:
-      - 'canonical': requested name is already canonical (exists in registry keys)
-      - 'alias': requested name is a declared alias for exactly one canonical name
-      - 'ambiguous': requested name matches aliases from multiple packages
-      - 'unknown': requested name matches neither canonicals nor aliases
-    """
-
     requested: str
     normalized: str
     canonical: Optional[str]
@@ -43,8 +95,16 @@ class PackageNameResolution:
 class ValidationResult:
     valid: bool
     reason: str
-    metadata: Dict[str, object] = field(default_factory=dict)
+    details: Optional[ValidationDetails] = None
     warnings: List[str] = field(default_factory=list)
+
+    @property
+    def metadata(self) -> Dict[str, object]:
+        if self.details is None:
+            return {}
+        if is_dataclass(self.details):
+            return asdict(self.details)
+        return {}
 
 
 @dataclass(frozen=True)
@@ -71,6 +131,8 @@ class PackageSpec:
     package: str
     spec: str
     prefix: str
+    confidence: str = "high"
+    assumptions: List[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -99,3 +161,21 @@ class BootstrapConfig:
     modules_optional: List[str]
     external_packages: List[str]
 
+
+@dataclass(frozen=True)
+class BootstrapResult:
+    config_path: str
+    platform: Optional[str]
+    modules: List[str]
+    packages: List[str]
+    strict: bool
+    dry_run: bool
+    detected: Dict[str, DetectedPackage]
+    linkage: Dict[str, PackageLinkage]
+    specs: Dict[str, PackageSpec]
+    toolchain: ToolchainCheckResult
+    output_report: Optional[str]
+    output_yaml: Optional[str]
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)

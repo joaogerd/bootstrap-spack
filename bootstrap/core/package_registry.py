@@ -156,7 +156,7 @@ PACKAGES: Dict[str, PackageDefinition] = {
             "cray-netcdf-hdf5parallel",
             "cray-parallel-netcdf",
         ],
-        tools=["nf-config"],
+        tools=["nf-config", "nc-config"],
         validation_type="netcdf-fortran",
         family="io",
         depends_on_netcdf_c=True,
@@ -164,7 +164,7 @@ PACKAGES: Dict[str, PackageDefinition] = {
     "hdf5": PackageDefinition(
         name="hdf5",
         aliases=["hdf5", "phdf5", "cray-hdf5", "cray-hdf5-parallel"],
-        tools=["h5cc", "hp5cc"],
+        tools=["h5cc", "h5pcc", "hp5cc"],
         validation_type="hdf5",
         family="io",
         parallel_optional=True,

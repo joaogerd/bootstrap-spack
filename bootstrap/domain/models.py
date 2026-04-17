@@ -103,6 +103,16 @@ class CompilerEntry:
 
 
 @dataclass(frozen=True)
+class SiteRuntimeConfig:
+    build_jobs: int
+    install_tree_root: str
+    build_stage: List[str]
+    test_stage: str
+    source_cache: str
+    misc_cache: str
+
+
+@dataclass(frozen=True)
 class LayeredSpackStackArtifacts:
     common_packages_yaml: str
     common_modules_yaml: str

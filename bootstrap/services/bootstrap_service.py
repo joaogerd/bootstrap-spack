@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
 import logging
+from typing import Optional
 
 from bootstrap.application.build_specs import run_build_specs
 from bootstrap.application.check_toolchain import run_toolchain_check
 from bootstrap.application.detect_packages import detect_requested_packages
 from bootstrap.application.inspect_linkage import run_linkage_inspection
 from bootstrap.core.package_registry import PACKAGES
-from bootstrap.domain.models import ExecutionContext
+from bootstrap.domain.models import BootstrapResult, ExecutionContext
 from bootstrap.infrastructure.env.config_loader import load_config
 from bootstrap.infrastructure.modules.module_system import load_base_modules
 from bootstrap.infrastructure.rendering.packages_yaml import generate_packages_yaml
@@ -28,9 +28,8 @@ class BootstrapService:
         strict_override: Optional[bool] = None,
         dry_run: bool = False,
         debug: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> BootstrapResult:
         config = load_config(self.config_path)
-
         strict = strict_override if strict_override is not None else config.strict_validation
 
         logger.info("Loading base modules")
@@ -48,21 +47,9 @@ class BootstrapService:
             registry=PACKAGES,
             context=context,
         )
-
-        linkage = run_linkage_inspection(
-            detected=detected,
-            context=context,
-        )
-
-        toolchain = run_toolchain_check(
-            detected=detected,
-            linkage=linkage,
-        )
-
-        specs = run_build_specs(
-            detected=detected,
-            linkage=linkage,
-        )
+        linkage = run_linkage_inspection(detected=detected, context=context)
+        toolchain = run_toolchain_check(detected=detected, linkage=linkage)
+        specs = run_build_specs(detected=detected, linkage=linkage)
 
         if not dry_run:
             logger.info("Writing packages.yaml to %s", output_yaml)
@@ -84,20 +71,26 @@ class BootstrapService:
         if debug:
             logger.debug("Toolchain: %s", toolchain.reason)
             for name, spec in specs.items():
-                logger.debug("Spec: %s -> %s (%s)", name, spec.spec, spec.prefix)
+                logger.debug(
+                    "Spec: %s -> %s (%s) confidence=%s assumptions=%s",
+                    name,
+                    spec.spec,
+                    spec.prefix,
+                    spec.confidence,
+                    spec.assumptions,
+                )
 
-        return {
-            "config_path": self.config_path,
-            "platform": config.platform,
-            "modules": list(config.modules_to_load),
-            "packages": list(config.external_packages),
-            "strict": strict,
-            "dry_run": dry_run,
-            "detected": detected,
-            "linkage": linkage,
-            "specs": specs,
-            "toolchain": toolchain,
-            "toolchain_valid": toolchain.valid,
-            "output_report": None if dry_run else output_report,
-            "output_yaml": None if dry_run else output_yaml,
-        }
+        return BootstrapResult(
+            config_path=self.config_path,
+            platform=config.platform,
+            modules=list(config.modules_to_load),
+            packages=list(config.external_packages),
+            strict=strict,
+            dry_run=dry_run,
+            detected=detected,
+            linkage=linkage,
+            specs=specs,
+            toolchain=toolchain,
+            output_report=None if dry_run else output_report,
+            output_yaml=None if dry_run else output_yaml,
+        )

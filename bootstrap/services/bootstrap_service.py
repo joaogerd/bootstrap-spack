@@ -16,6 +16,7 @@ from bootstrap.infrastructure.modules.module_system import load_base_modules
 from bootstrap.infrastructure.rendering.packages_yaml import generate_packages_yaml
 from bootstrap.infrastructure.rendering.report_writer import write_detection_report
 from bootstrap.infrastructure.rendering.site_tree import write_site_tree
+from bootstrap.infrastructure.site.runtime_config import detect_site_runtime_config
 
 logger = logging.getLogger(__name__)
 
@@ -73,12 +74,14 @@ class BootstrapService:
 
             if config.site.enabled:
                 compiler = detect_compiler_entry(base_env, list(config.modules_to_load))
+                runtime_config = detect_site_runtime_config(config.site, base_env, config.platform)
                 site_root = str(Path(output_yaml).parent)
                 site_dir = write_site_tree(
                     site_root,
                     site=config.site,
                     template=config.template,
                     compiler=compiler,
+                    runtime_config=runtime_config,
                     detected=detected,
                     specs=specs,
                 )

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, Tuple
 
 from bootstrap.domain.models import NetcdfFortranValidationDetails, ValidationResult
 from bootstrap.infrastructure.validation.common import (
@@ -12,17 +12,48 @@ from bootstrap.infrastructure.validation.common import (
 )
 
 
-def validate_netcdf_fortran(tool_paths: Dict[str, str], env: Dict[str, str], strict: bool) -> ValidationResult:
+def _resolve_fortran_config(tool_paths: Dict[str, str], env: Dict[str, str]) -> Tuple[str | None, str, str, str, str]:
     nf_config = tool_paths.get("nf-config")
-    if not nf_config:
-        return ValidationResult(valid=False, reason="nf-config not found")
+    if nf_config:
+        prefix_res = run_cmd([nf_config, "--prefix"], env)
+        version_res = run_cmd([nf_config, "--version"], env)
+        fflags_res = run_cmd([nf_config, "--fflags"], env)
+        flibs_res = run_cmd([nf_config, "--flibs"], env)
+        return (
+            nf_config,
+            prefix_res.stdout.strip() or infer_prefix_from_tool(nf_config) or "",
+            version_res.stdout.strip(),
+            fflags_res.stdout.strip(),
+            flibs_res.stdout.strip(),
+        )
 
-    prefix_res = run_cmd([nf_config, "--prefix"], env)
-    version_res = run_cmd([nf_config, "--version"], env)
-    fflags_res = run_cmd([nf_config, "--fflags"], env)
-    flibs_res = run_cmd([nf_config, "--flibs"], env)
+    nc_config = tool_paths.get("nc-config")
+    if not nc_config:
+        return None, "", "", "", ""
 
-    prefix = prefix_res.stdout.strip() or infer_prefix_from_tool(nf_config)
+    has_fortran_res = run_cmd([nc_config, "--has-fortran"], env)
+    has_fortran_text = " ".join([has_fortran_res.stdout or "", has_fortran_res.stderr or ""]).lower()
+    if "yes" not in has_fortran_text:
+        return None, "", "", "", ""
+
+    prefix_res = run_cmd([nc_config, "--prefix"], env)
+    version_res = run_cmd([nc_config, "--version"], env)
+    fflags_res = run_cmd([nc_config, "--fflags"], env)
+    flibs_res = run_cmd([nc_config, "--flibs"], env)
+    return (
+        nc_config,
+        prefix_res.stdout.strip() or infer_prefix_from_tool(nc_config) or "",
+        version_res.stdout.strip(),
+        fflags_res.stdout.strip(),
+        flibs_res.stdout.strip(),
+    )
+
+
+def validate_netcdf_fortran(tool_paths: Dict[str, str], env: Dict[str, str], strict: bool) -> ValidationResult:
+    config_tool, prefix, version_line, fflags, flibs = _resolve_fortran_config(tool_paths, env)
+    if not config_tool:
+        return ValidationResult(valid=False, reason="nf-config or nc-config with Fortran support not found")
+
     compiler = select_fortran_compiler(env)
 
     compile_result = None
@@ -32,11 +63,11 @@ def validate_netcdf_fortran(tool_paths: Dict[str, str], env: Dict[str, str], str
                 valid=False,
                 reason="no Fortran compiler available for NetCDF-Fortran validation",
                 details=NetcdfFortranValidationDetails(
-                    prefix=prefix,
-                    version_line=version_res.stdout.strip(),
-                    version=normalize_version(version_res.stdout),
-                    fflags=fflags_res.stdout.strip(),
-                    flibs=flibs_res.stdout.strip(),
+                    prefix=prefix or None,
+                    version_line=version_line,
+                    version=normalize_version(version_line),
+                    fflags=fflags,
+                    flibs=flibs,
                     fc_used=None,
                     compile=None,
                 ),
@@ -55,8 +86,8 @@ def validate_netcdf_fortran(tool_paths: Dict[str, str], env: Dict[str, str], str
             compiler,
             code,
             env,
-            flags=fflags_res.stdout.strip(),
-            libs=flibs_res.stdout.strip(),
+            flags=fflags,
+            libs=flibs,
         )
 
         if not compile_result.ok:
@@ -64,11 +95,11 @@ def validate_netcdf_fortran(tool_paths: Dict[str, str], env: Dict[str, str], str
                 valid=False,
                 reason="NetCDF-Fortran compilation failed",
                 details=NetcdfFortranValidationDetails(
-                    prefix=prefix,
-                    version_line=version_res.stdout.strip(),
-                    version=normalize_version(version_res.stdout),
-                    fflags=fflags_res.stdout.strip(),
-                    flibs=flibs_res.stdout.strip(),
+                    prefix=prefix or None,
+                    version_line=version_line,
+                    version=normalize_version(version_line),
+                    fflags=fflags,
+                    flibs=flibs,
                     fc_used=compiler,
                     compile=compile_result,
                 ),
@@ -78,11 +109,11 @@ def validate_netcdf_fortran(tool_paths: Dict[str, str], env: Dict[str, str], str
         valid=True,
         reason="NetCDF-Fortran validation passed",
         details=NetcdfFortranValidationDetails(
-            prefix=prefix,
-            version_line=version_res.stdout.strip(),
-            version=normalize_version(version_res.stdout),
-            fflags=fflags_res.stdout.strip(),
-            flibs=flibs_res.stdout.strip(),
+            prefix=prefix or None,
+            version_line=version_line,
+            version=normalize_version(version_line),
+            fflags=fflags,
+            flibs=flibs,
             fc_used=compiler,
             compile=compile_result,
         ),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from typing import Dict, Optional
 
 from bootstrap.domain.models import ExecutionContext, PackageDefinition, ValidationResult
@@ -14,17 +15,17 @@ logger = logging.getLogger(__name__)
 
 
 def _patch_prefix(prefix: Optional[str], result: ValidationResult) -> ValidationResult:
-    if not prefix:
+    if not prefix or result.details is None:
         return result
-    if result.details is None:
+
+    if hasattr(result.details, "prefix") and getattr(result.details, "prefix"):
         return result
-    metadata = result.metadata
-    if metadata.get("prefix"):
-        return result
+
     try:
-        patched_details = type(result.details)(**{**metadata, "prefix": prefix})
-    except Exception:
+        patched_details = replace(result.details, prefix=prefix)
+    except TypeError:
         return result
+
     return ValidationResult(
         valid=result.valid,
         reason=result.reason,

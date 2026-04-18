@@ -1,6 +1,6 @@
 [project]
 name = "bootstrap-spack"
-version = "0.1.0"
+version = "0.2.0"
 description = "HPC external package detection and Spack bootstrap generator"
 authors = [
     { name = "João Gerd" }

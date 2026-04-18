@@ -3,47 +3,47 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from bootstrap.domain.models import (
-    CompilerEntry,
-    LayeredSpackStackArtifacts,
-    SiteConfig,
-    SiteRuntimeConfig,
-    TemplateConfig,
-)
+from bootstrap.domain.models import DerivedSitePolicy, LayeredSpackStackArtifacts
 from bootstrap.infrastructure.rendering.compilers_yaml import generate_compilers_yaml
 from bootstrap.infrastructure.rendering.config_yaml import generate_config_yaml
 from bootstrap.infrastructure.rendering.modules_yaml import (
-    generate_common_modules_yaml,
-    generate_site_modules_yaml,
+    generate_common_modules_yaml_from_policy,
+    generate_site_modules_yaml_from_policy,
 )
 from bootstrap.infrastructure.rendering.packages_yaml import (
-    generate_common_packages_yaml,
-    generate_site_packages_yaml,
+    generate_common_packages_yaml_from_policy,
+    generate_site_packages_yaml_from_policy,
 )
 from bootstrap.infrastructure.rendering.template_spack_yaml import generate_template_spack_yaml
 
 
-def build_spack_stack_artifacts(
-    *,
-    site: SiteConfig,
-    template: TemplateConfig,
-    compiler: CompilerEntry,
-    runtime_config: SiteRuntimeConfig,
-    detected,
-    specs,
-) -> LayeredSpackStackArtifacts:
-    core_compilers = list(site.core_compilers) if site.core_compilers else [compiler.spec]
+def build_spack_stack_artifacts(*, policy: DerivedSitePolicy) -> LayeredSpackStackArtifacts:
     template_spack_yaml = None
-    if template.enabled:
-        template_spack_yaml = generate_template_spack_yaml(template.specs, compiler=template.compiler)
+    if policy.template.enabled:
+        template_spack_yaml = generate_template_spack_yaml(
+            policy.template.specs,
+            compiler=policy.template.compiler,
+        )
+
+    site_compilers_yaml = generate_compilers_yaml([policy.compiler]) if policy.compiler is not None else generate_compilers_yaml([])
+    site_config_yaml = generate_config_yaml(policy.runtime) if policy.runtime is not None else generate_config_yaml(
+        type("_Runtime", (), {
+            "build_jobs": policy.site.build_jobs,
+            "install_tree_root": "",
+            "build_stage": [],
+            "test_stage": "",
+            "source_cache": "",
+            "misc_cache": "",
+        })()
+    )
 
     return LayeredSpackStackArtifacts(
-        common_packages_yaml=generate_common_packages_yaml(detected),
-        common_modules_yaml=generate_common_modules_yaml(site.module_system),
-        site_packages_yaml=generate_site_packages_yaml(detected, specs),
-        site_compilers_yaml=generate_compilers_yaml([compiler]),
-        site_modules_yaml=generate_site_modules_yaml(site.module_system, core_compilers),
-        site_config_yaml=generate_config_yaml(runtime_config),
+        common_packages_yaml=generate_common_packages_yaml_from_policy(policy),
+        common_modules_yaml=generate_common_modules_yaml_from_policy(policy),
+        site_packages_yaml=generate_site_packages_yaml_from_policy(policy),
+        site_compilers_yaml=site_compilers_yaml,
+        site_modules_yaml=generate_site_modules_yaml_from_policy(policy),
+        site_config_yaml=site_config_yaml,
         template_spack_yaml=template_spack_yaml,
     )
 
@@ -51,10 +51,11 @@ def build_spack_stack_artifacts(
 def write_spack_stack_layout(
     output_root: str,
     *,
-    site: SiteConfig,
-    template: TemplateConfig,
+    policy: DerivedSitePolicy,
     artifacts: LayeredSpackStackArtifacts,
 ) -> Optional[str]:
+    site = policy.site
+    template = policy.template
     if not site.enabled or not site.name:
         return None
 
@@ -86,27 +87,14 @@ def write_spack_stack_layout(
 def write_site_tree(
     output_root: str,
     *,
-    site: SiteConfig,
-    template: TemplateConfig,
-    compiler: CompilerEntry,
-    runtime_config: SiteRuntimeConfig,
-    detected,
-    specs,
+    policy: DerivedSitePolicy,
 ) -> Optional[str]:
-    if not site.enabled or not site.name:
+    if not policy.site.enabled or not policy.site.name:
         return None
 
-    artifacts = build_spack_stack_artifacts(
-        site=site,
-        template=template,
-        compiler=compiler,
-        runtime_config=runtime_config,
-        detected=detected,
-        specs=specs,
-    )
+    artifacts = build_spack_stack_artifacts(policy=policy)
     return write_spack_stack_layout(
         output_root,
-        site=site,
-        template=template,
+        policy=policy,
         artifacts=artifacts,
     )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Dict, List, Optional
 
 from bootstrap.domain.models import (
@@ -12,6 +13,7 @@ from bootstrap.domain.models import (
     PolicyDecisionTrace,
     PolicyDerivationBundle,
     PolicyTraceEntry,
+    SiteRuntimeConfig,
 )
 
 
@@ -25,6 +27,7 @@ def derive_policy_providers(detected: Dict[str, DetectedPackage]) -> Dict[str, l
             break
 
     return providers
+
 
 
 def build_detected_host_facts(
@@ -48,8 +51,41 @@ def build_detected_host_facts(
     )
 
 
-def _build_policy_authority(*, config, facts: DetectedHostFacts, providers: Dict[str, list[str]]) -> Dict[str, PolicyAuthority]:
+
+def _apply_runtime_overrides(config, runtime: Optional[SiteRuntimeConfig]) -> Optional[SiteRuntimeConfig]:
+    overrides = config.site.policy_overrides.runtime
+    if runtime is None:
+        return None
+
+    return SiteRuntimeConfig(
+        build_jobs=overrides.build_jobs or runtime.build_jobs,
+        install_tree_root=overrides.install_tree_root or runtime.install_tree_root,
+        build_stage=list(overrides.build_stage) if overrides.build_stage else list(runtime.build_stage),
+        test_stage=overrides.test_stage or runtime.test_stage,
+        source_cache=overrides.source_cache or runtime.source_cache,
+        misc_cache=overrides.misc_cache or runtime.misc_cache,
+    )
+
+
+
+def _apply_provider_overrides(config, providers: Dict[str, list[str]]) -> Dict[str, list[str]]:
+    updated = dict(providers)
+    override_mpi = list(config.site.policy_overrides.mpi_provider)
+    if override_mpi:
+        updated["mpi"] = override_mpi
+    return updated
+
+
+
+def _build_policy_authority(
+    *,
+    config,
+    facts: DetectedHostFacts,
+    providers: Dict[str, list[str]],
+    runtime: Optional[SiteRuntimeConfig],
+) -> Dict[str, PolicyAuthority]:
     authority: Dict[str, PolicyAuthority] = {}
+    runtime_overrides = config.site.policy_overrides.runtime
 
     if facts.module_system:
         authority["module_system"] = PolicyAuthority(
@@ -69,45 +105,95 @@ def _build_policy_authority(*, config, facts: DetectedHostFacts, providers: Dict
             confidence="medium" if facts.platform_family in {"cray", "cluster"} else "high",
         )
 
-    if facts.runtime is not None:
+    if runtime is not None:
         authority["runtime.build_jobs"] = PolicyAuthority(
             key="runtime.build_jobs",
-            value=str(facts.runtime.build_jobs),
-            source="policy",
-            rationale="build jobs derived from detected host capacity and site limits",
-            confidence="medium",
-            fallback_used="site.build_jobs" if facts.runtime.build_jobs == config.site.build_jobs else None,
+            value=str(runtime.build_jobs),
+            source="override" if runtime_overrides.build_jobs is not None else "policy",
+            rationale=(
+                "build jobs forced by site.policy_overrides.runtime.build_jobs"
+                if runtime_overrides.build_jobs is not None
+                else "build jobs derived from detected host capacity and site limits"
+            ),
+            confidence="high" if runtime_overrides.build_jobs is not None else "medium",
+            fallback_used="site.build_jobs" if runtime_overrides.build_jobs is None and facts.runtime and facts.runtime.build_jobs == config.site.build_jobs else None,
+            overridden_by="site.policy_overrides.runtime.build_jobs" if runtime_overrides.build_jobs is not None else None,
         )
         authority["runtime.install_tree_root"] = PolicyAuthority(
             key="runtime.install_tree_root",
-            value=facts.runtime.install_tree_root,
-            source="policy",
-            rationale="install tree root derived from detected runtime policy",
-            confidence="medium",
+            value=runtime.install_tree_root,
+            source="override" if runtime_overrides.install_tree_root else "policy",
+            rationale=(
+                "install tree root forced by site.policy_overrides.runtime.install_tree_root"
+                if runtime_overrides.install_tree_root
+                else "install tree root derived from detected runtime policy"
+            ),
+            confidence="high" if runtime_overrides.install_tree_root else "medium",
+            overridden_by="site.policy_overrides.runtime.install_tree_root" if runtime_overrides.install_tree_root else None,
         )
         authority["runtime.build_stage"] = PolicyAuthority(
             key="runtime.build_stage",
-            value=str(facts.runtime.build_stage),
-            source="policy",
-            rationale="build stage derived from detected scratch and temporary paths",
-            confidence="medium",
+            value=str(runtime.build_stage),
+            source="override" if runtime_overrides.build_stage else "policy",
+            rationale=(
+                "build stage forced by site.policy_overrides.runtime.build_stage"
+                if runtime_overrides.build_stage
+                else "build stage derived from detected scratch and temporary paths"
+            ),
+            confidence="high" if runtime_overrides.build_stage else "medium",
+            overridden_by="site.policy_overrides.runtime.build_stage" if runtime_overrides.build_stage else None,
         )
         authority["runtime.test_stage"] = PolicyAuthority(
             key="runtime.test_stage",
-            value=facts.runtime.test_stage,
-            source="policy",
-            rationale="test stage derived from detected scratch and temporary paths",
-            confidence="medium",
+            value=runtime.test_stage,
+            source="override" if runtime_overrides.test_stage else "policy",
+            rationale=(
+                "test stage forced by site.policy_overrides.runtime.test_stage"
+                if runtime_overrides.test_stage
+                else "test stage derived from detected scratch and temporary paths"
+            ),
+            confidence="high" if runtime_overrides.test_stage else "medium",
+            overridden_by="site.policy_overrides.runtime.test_stage" if runtime_overrides.test_stage else None,
+        )
+        authority["runtime.source_cache"] = PolicyAuthority(
+            key="runtime.source_cache",
+            value=runtime.source_cache,
+            source="override" if runtime_overrides.source_cache else "policy",
+            rationale=(
+                "source cache forced by site.policy_overrides.runtime.source_cache"
+                if runtime_overrides.source_cache
+                else "source cache derived from detected runtime policy"
+            ),
+            confidence="high" if runtime_overrides.source_cache else "medium",
+            overridden_by="site.policy_overrides.runtime.source_cache" if runtime_overrides.source_cache else None,
+        )
+        authority["runtime.misc_cache"] = PolicyAuthority(
+            key="runtime.misc_cache",
+            value=runtime.misc_cache,
+            source="override" if runtime_overrides.misc_cache else "policy",
+            rationale=(
+                "misc cache forced by site.policy_overrides.runtime.misc_cache"
+                if runtime_overrides.misc_cache
+                else "misc cache derived from detected runtime policy"
+            ),
+            confidence="high" if runtime_overrides.misc_cache else "medium",
+            overridden_by="site.policy_overrides.runtime.misc_cache" if runtime_overrides.misc_cache else None,
         )
 
     if "mpi" in providers:
+        override_mpi = list(config.site.policy_overrides.mpi_provider)
         authority["providers.mpi"] = PolicyAuthority(
             key="providers.mpi",
             value=str(providers["mpi"]),
-            source="policy",
-            rationale="provider chosen from validated MPI implementations using current provider selection rule",
-            confidence="medium",
-            fallback_used="preference order: openmpi -> mpich",
+            source="override" if override_mpi else "policy",
+            rationale=(
+                "MPI provider forced by site.policy_overrides.providers.mpi"
+                if override_mpi
+                else "provider chosen from validated MPI implementations using current provider selection rule"
+            ),
+            confidence="high" if override_mpi else "medium",
+            fallback_used=None if override_mpi else "preference order: openmpi -> mpich",
+            overridden_by="site.policy_overrides.providers.mpi" if override_mpi else None,
         )
 
     common_modules_enabled = [config.site.module_system] if config.site.enabled else []
@@ -132,15 +218,17 @@ def _build_policy_authority(*, config, facts: DetectedHostFacts, providers: Dict
     return authority
 
 
+
 def derive_site_policy(*, config, facts: DetectedHostFacts, specs: Dict[str, PackageSpec]) -> DerivedSitePolicy:
     common_modules_enabled = [config.site.module_system] if config.site.enabled else []
-    providers = derive_policy_providers(facts.packages)
-    authority = _build_policy_authority(config=config, facts=facts, providers=providers)
+    providers = _apply_provider_overrides(config, derive_policy_providers(facts.packages))
+    runtime = _apply_runtime_overrides(config, facts.runtime)
+    authority = _build_policy_authority(config=config, facts=facts, providers=providers, runtime=runtime)
 
     return DerivedSitePolicy(
         site=config.site,
         template=config.template,
-        runtime=facts.runtime,
+        runtime=runtime,
         compiler=facts.compiler,
         requested_packages=list(config.external_packages),
         packages=dict(specs),
@@ -148,6 +236,7 @@ def derive_site_policy(*, config, facts: DetectedHostFacts, specs: Dict[str, Pac
         common_modules_enabled=common_modules_enabled,
         authority=authority,
     )
+
 
 
 def _trace_entry(
@@ -165,6 +254,7 @@ def _trace_entry(
         confidence=confidence,
         fallback_used=fallback_used,
     )
+
 
 
 def _build_trace_entries(*, config, facts: DetectedHostFacts, policy: DerivedSitePolicy, strict: bool) -> List[PolicyTraceEntry]:
@@ -225,6 +315,7 @@ def _build_trace_entries(*, config, facts: DetectedHostFacts, policy: DerivedSit
     return entries
 
 
+
 def build_policy_trace(*, config, facts: DetectedHostFacts, policy: DerivedSitePolicy, strict: bool) -> PolicyDecisionTrace:
     entries = _build_trace_entries(config=config, facts=facts, policy=policy, strict=strict)
     decisions = [entry.message for entry in entries]
@@ -250,6 +341,7 @@ def build_policy_trace(*, config, facts: DetectedHostFacts, policy: DerivedSiteP
         assumptions=sorted(set(assumptions)),
         entries=entries,
     )
+
 
 
 def derive_policy_bundle(

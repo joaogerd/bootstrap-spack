@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field, is_dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 SUPPORTED_SITE_LAYOUTS = ("spack-stack",)
+
+PolicySource = Literal["config", "detection", "policy", "override", "default", "legacy-compat"]
+PolicyConfidence = Literal["high", "medium", "low", "heuristic"]
 
 
 @dataclass(frozen=True)
@@ -239,9 +242,9 @@ class DetectedHostFacts:
 class PolicyAuthority:
     key: str
     value: str
-    source: str
+    source: PolicySource
     rationale: str
-    confidence: str = "high"
+    confidence: PolicyConfidence = "high"
     fallback_used: Optional[str] = None
     overridden_by: Optional[str] = None
     legacy_compat_used: bool = False
@@ -263,9 +266,9 @@ class DerivedSitePolicy:
 @dataclass(frozen=True)
 class PolicyTraceEntry:
     message: str
-    source: str
+    source: PolicySource
     rationale: str
-    confidence: str = "high"
+    confidence: PolicyConfidence = "high"
     fallback_used: Optional[str] = None
 
 

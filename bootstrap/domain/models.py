@@ -236,6 +236,18 @@ class DetectedHostFacts:
 
 
 @dataclass(frozen=True)
+class PolicyAuthority:
+    key: str
+    value: str
+    source: str
+    rationale: str
+    confidence: str = "high"
+    fallback_used: Optional[str] = None
+    overridden_by: Optional[str] = None
+    legacy_compat_used: bool = False
+
+
+@dataclass(frozen=True)
 class DerivedSitePolicy:
     site: SiteConfig
     template: TemplateConfig
@@ -245,6 +257,7 @@ class DerivedSitePolicy:
     packages: Dict[str, PackageSpec]
     providers: Dict[str, List[str]] = field(default_factory=dict)
     common_modules_enabled: List[str] = field(default_factory=list)
+    authority: Dict[str, PolicyAuthority] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

@@ -224,6 +224,36 @@ class BootstrapConfig:
 
 
 @dataclass(frozen=True)
+class DetectedHostFacts:
+    platform_family: Optional[str]
+    module_system: Optional[str]
+    loaded_modules: List[str]
+    optional_modules: List[str]
+    compiler: Optional[CompilerEntry]
+    packages: Dict[str, DetectedPackage]
+    linkage: Dict[str, PackageLinkage]
+    runtime: Optional[SiteRuntimeConfig]
+
+
+@dataclass(frozen=True)
+class DerivedSitePolicy:
+    site: SiteConfig
+    template: TemplateConfig
+    runtime: Optional[SiteRuntimeConfig]
+    compiler: Optional[CompilerEntry]
+    packages: Dict[str, PackageSpec]
+    providers: Dict[str, List[str]] = field(default_factory=dict)
+    common_modules_enabled: List[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class PolicyDecisionTrace:
+    decisions: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+    assumptions: List[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class BootstrapResult:
     config_path: str
     platform: Optional[str]
@@ -237,6 +267,9 @@ class BootstrapResult:
     toolchain: ToolchainCheckResult
     output_report: Optional[str]
     output_yaml: Optional[str]
+    facts: Optional[DetectedHostFacts] = None
+    policy: Optional[DerivedSitePolicy] = None
+    trace: Optional[PolicyDecisionTrace] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

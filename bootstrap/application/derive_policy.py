@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from bootstrap.domain.models import (
+    AUTHORITY_PRECEDENCE,
     DerivedSitePolicy,
     DetectedHostFacts,
     DetectedPackage,
@@ -11,6 +12,7 @@ from bootstrap.domain.models import (
     PolicyAuthority,
     PolicyDecisionTrace,
     PolicyDerivationBundle,
+    PolicySource,
     PolicyTraceEntry,
     SiteRuntimeConfig,
 )
@@ -51,6 +53,33 @@ def build_detected_host_facts(
 
 
 
+def _authority(
+    *,
+    key: str,
+    value: str,
+    source: PolicySource,
+    rationale: str,
+    confidence: str = "high",
+    fallback_used: Optional[str] = None,
+    overridden_by: Optional[str] = None,
+    supersedes_source: Optional[PolicySource] = None,
+    legacy_compat_used: bool = False,
+) -> PolicyAuthority:
+    return PolicyAuthority(
+        key=key,
+        value=value,
+        source=source,
+        rationale=rationale,
+        confidence=confidence,
+        precedence_rank=AUTHORITY_PRECEDENCE[source],
+        fallback_used=fallback_used,
+        overridden_by=overridden_by,
+        supersedes_source=supersedes_source,
+        legacy_compat_used=legacy_compat_used,
+    )
+
+
+
 def _apply_runtime_overrides(config, runtime: Optional[SiteRuntimeConfig]) -> Optional[SiteRuntimeConfig]:
     overrides = config.site.policy_overrides.runtime
     if runtime is None:
@@ -87,7 +116,7 @@ def _build_policy_authority(
     runtime_overrides = config.site.policy_overrides.runtime
 
     if facts.module_system:
-        authority["module_system"] = PolicyAuthority(
+        authority["module_system"] = _authority(
             key="module_system",
             value=facts.module_system,
             source="config",
@@ -96,7 +125,7 @@ def _build_policy_authority(
         )
 
     if facts.compiler is not None:
-        authority["compiler"] = PolicyAuthority(
+        authority["compiler"] = _authority(
             key="compiler",
             value=facts.compiler.spec,
             source="detection",
@@ -105,7 +134,7 @@ def _build_policy_authority(
         )
 
     if runtime is not None:
-        authority["runtime.build_jobs"] = PolicyAuthority(
+        authority["runtime.build_jobs"] = _authority(
             key="runtime.build_jobs",
             value=str(runtime.build_jobs),
             source="override" if runtime_overrides.build_jobs is not None else "policy",
@@ -117,8 +146,9 @@ def _build_policy_authority(
             confidence="high" if runtime_overrides.build_jobs is not None else "medium",
             fallback_used="site.build_jobs" if runtime_overrides.build_jobs is None and facts.runtime and facts.runtime.build_jobs == config.site.build_jobs else None,
             overridden_by="site.policy_overrides.runtime.build_jobs" if runtime_overrides.build_jobs is not None else None,
+            supersedes_source="policy" if runtime_overrides.build_jobs is not None else None,
         )
-        authority["runtime.install_tree_root"] = PolicyAuthority(
+        authority["runtime.install_tree_root"] = _authority(
             key="runtime.install_tree_root",
             value=runtime.install_tree_root,
             source="override" if runtime_overrides.install_tree_root else "policy",
@@ -129,8 +159,9 @@ def _build_policy_authority(
             ),
             confidence="high" if runtime_overrides.install_tree_root else "medium",
             overridden_by="site.policy_overrides.runtime.install_tree_root" if runtime_overrides.install_tree_root else None,
+            supersedes_source="policy" if runtime_overrides.install_tree_root else None,
         )
-        authority["runtime.build_stage"] = PolicyAuthority(
+        authority["runtime.build_stage"] = _authority(
             key="runtime.build_stage",
             value=str(runtime.build_stage),
             source="override" if runtime_overrides.build_stage else "policy",
@@ -141,8 +172,9 @@ def _build_policy_authority(
             ),
             confidence="high" if runtime_overrides.build_stage else "medium",
             overridden_by="site.policy_overrides.runtime.build_stage" if runtime_overrides.build_stage else None,
+            supersedes_source="policy" if runtime_overrides.build_stage else None,
         )
-        authority["runtime.test_stage"] = PolicyAuthority(
+        authority["runtime.test_stage"] = _authority(
             key="runtime.test_stage",
             value=runtime.test_stage,
             source="override" if runtime_overrides.test_stage else "policy",
@@ -153,8 +185,9 @@ def _build_policy_authority(
             ),
             confidence="high" if runtime_overrides.test_stage else "medium",
             overridden_by="site.policy_overrides.runtime.test_stage" if runtime_overrides.test_stage else None,
+            supersedes_source="policy" if runtime_overrides.test_stage else None,
         )
-        authority["runtime.source_cache"] = PolicyAuthority(
+        authority["runtime.source_cache"] = _authority(
             key="runtime.source_cache",
             value=runtime.source_cache,
             source="override" if runtime_overrides.source_cache else "policy",
@@ -165,8 +198,9 @@ def _build_policy_authority(
             ),
             confidence="high" if runtime_overrides.source_cache else "medium",
             overridden_by="site.policy_overrides.runtime.source_cache" if runtime_overrides.source_cache else None,
+            supersedes_source="policy" if runtime_overrides.source_cache else None,
         )
-        authority["runtime.misc_cache"] = PolicyAuthority(
+        authority["runtime.misc_cache"] = _authority(
             key="runtime.misc_cache",
             value=runtime.misc_cache,
             source="override" if runtime_overrides.misc_cache else "policy",
@@ -177,11 +211,12 @@ def _build_policy_authority(
             ),
             confidence="high" if runtime_overrides.misc_cache else "medium",
             overridden_by="site.policy_overrides.runtime.misc_cache" if runtime_overrides.misc_cache else None,
+            supersedes_source="policy" if runtime_overrides.misc_cache else None,
         )
 
     if "mpi" in providers:
         override_mpi = list(config.site.policy_overrides.mpi_provider)
-        authority["providers.mpi"] = PolicyAuthority(
+        authority["providers.mpi"] = _authority(
             key="providers.mpi",
             value=str(providers["mpi"]),
             source="override" if override_mpi else "policy",
@@ -193,11 +228,12 @@ def _build_policy_authority(
             confidence="high" if override_mpi else "medium",
             fallback_used=None if override_mpi else "preference order: openmpi -> mpich",
             overridden_by="site.policy_overrides.providers.mpi" if override_mpi else None,
+            supersedes_source="policy" if override_mpi else None,
         )
 
     common_modules_enabled = [config.site.module_system] if config.site.enabled else []
     if common_modules_enabled:
-        authority["common_modules_enabled"] = PolicyAuthority(
+        authority["common_modules_enabled"] = _authority(
             key="common_modules_enabled",
             value=str(common_modules_enabled),
             source="policy",
@@ -206,7 +242,7 @@ def _build_policy_authority(
         )
 
     if config.template.enabled:
-        authority["template.enabled"] = PolicyAuthority(
+        authority["template.enabled"] = _authority(
             key="template.enabled",
             value=config.template.name or "unnamed-template",
             source="config",

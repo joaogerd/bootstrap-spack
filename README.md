@@ -35,6 +35,7 @@ The tool now operates around explicit internal layers for:
 - derived site policy;
 - policy authority;
 - policy decision trace;
+- controlled policy overrides;
 - layered artifact generation.
 
 In practical terms, the project now distinguishes more clearly between:
@@ -43,6 +44,7 @@ In practical terms, the project now distinguishes more clearly between:
 - what was inferred as site policy;
 - which authority produced each important policy value;
 - why those policy decisions were taken;
+- which values were deliberately overridden;
 - what was rendered as final configuration files.
 
 The policy trace is no longer only a flat list of messages. It now supports structured trace entries that capture:
@@ -261,6 +263,32 @@ output:
   directory: .
 ```
 
+### Example with controlled policy overrides
+
+```yaml
+site:
+  name: egeon
+  layout: spack-stack
+  module_system: lmod
+  build_jobs: 8
+  core_compilers:
+    - gcc@9.4.0
+  policy_overrides:
+    providers:
+      mpi:
+        - openmpi
+    runtime:
+      build_jobs: 16
+      install_tree_root: /scratch/site/spack/opt
+      build_stage:
+        - /scratch/site/spack/stage
+      test_stage: /scratch/site/spack/test
+      source_cache: /scratch/site/spack/cache/source
+      misc_cache: /scratch/site/spack/cache/misc
+```
+
+These overrides are not applied silently. They become part of the derived policy, are marked as explicit authority in the report, and are traced as override decisions.
+
 ---
 
 ## Internal architecture model
@@ -305,8 +333,10 @@ Each authority record captures:
 - `source`
 - `rationale`
 - `confidence`
+- `precedence_rank`
 - `fallback_used`
 - `overridden_by`
+- `supersedes_source`
 - `legacy_compat_used`
 
 This is the semantic layer that allows the tool to distinguish between values that came from configuration, detection, derived policy, explicit override, default behavior or legacy compatibility.
@@ -342,6 +372,33 @@ This separation is important because it allows the tool to state more clearly wh
 
 ---
 
+## Policy authority precedence
+
+The 0.4.x line now models a baseline precedence order for important policy decisions.
+
+Current precedence ranks are:
+
+- `legacy-compat` → `0`
+- `default` → `100`
+- `policy` → `200`
+- `detection` → `300`
+- `config` → `400`
+- `override` → `500`
+
+This does not mean every field is decided the same way, but it gives the system an explicit normative order for authority reporting.
+
+In practical terms:
+
+- legacy compatibility should never win silently over newer semantics;
+- defaults are weaker than derived policy;
+- derived policy is weaker than observed detection when the field is evidence-driven;
+- configuration is stronger than inferred policy when the site declares a value directly;
+- explicit override is the strongest authority currently modeled.
+
+This precedence is now represented directly in `PolicyAuthority` and rendered in the detection report.
+
+---
+
 ## Outputs
 
 ## Unified outputs
@@ -371,6 +428,7 @@ A human-readable report with:
 - policy authority
 - policy decision trace
 - structured trace entries for policy decisions
+- precedence metadata for authority records
 
 ## Layered outputs
 
@@ -427,6 +485,7 @@ Some design choices are deliberate:
 
 - detected facts and generated policy are kept separate as much as possible
 - policy authority is modeled explicitly rather than left implicit in helper behavior
+- override is treated as a formal authority layer rather than a silent mutation
 - platform-specific behavior is handled pragmatically rather than abstractly over-generalized
 - renderers are split by output artifact
 - the project favors inspectable YAML outputs over hidden implicit behavior
@@ -447,6 +506,8 @@ The current implementation is strongest in these areas:
 - explicit modeling of detected facts, derived policy and policy trace
 - explicit modeling of authority for important policy decisions
 - structured policy trace entries that make derivation decisions more auditable
+- controlled policy override handling for core runtime and MPI provider decisions
+- explicit precedence ranks for policy authority records
 
 ---
 
@@ -462,7 +523,8 @@ Important current limitations include:
 - some generated policy is still derived automatically from detected host facts, which may need manual refinement in institutional environments
 - module system behavior can remain site-specific and sometimes surprising on real HPC machines
 - provider selection and runtime policy remain pragmatic and are still being refined in the 0.4.x line
-- override handling is now part of the semantic model, but broader controlled override flows are still being expanded
+- override handling is now part of the semantic model, but broader controlled override flows are still being expanded beyond the first central runtime/provider cases
+- precedence is now explicit, but field-specific authority rules are still being refined in the 0.4.x line
 
 ---
 
@@ -504,6 +566,7 @@ The project includes focused unit tests for:
 - command runner behavior
 - configuration loading for layered site/template flows
 - bootstrap service integration
+- controlled override derivation semantics
 
 ---
 
@@ -531,6 +594,7 @@ The current direction of the project points toward:
 - more explicit platform profiles
 - broader package support and additional validation backends
 - stronger integration-style tests for real bootstrap flows
+- clearer field-specific authority rules on top of the baseline precedence model
 
 ---
 

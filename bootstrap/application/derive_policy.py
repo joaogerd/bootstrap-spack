@@ -4,6 +4,7 @@ from typing import Dict, List, Optional
 
 from bootstrap.domain.models import (
     AUTHORITY_PRECEDENCE,
+    FIELD_AUTHORITY_RULES,
     DerivedSitePolicy,
     DetectedHostFacts,
     DetectedPackage,
@@ -65,6 +66,7 @@ def _authority(
     supersedes_source: Optional[PolicySource] = None,
     legacy_compat_used: bool = False,
 ) -> PolicyAuthority:
+    rule = FIELD_AUTHORITY_RULES.get(key)
     return PolicyAuthority(
         key=key,
         value=value,
@@ -76,6 +78,11 @@ def _authority(
         overridden_by=overridden_by,
         supersedes_source=supersedes_source,
         legacy_compat_used=legacy_compat_used,
+        field_kind=rule.field_kind if rule else None,
+        preferred_source=rule.preferred_source if rule else None,
+        allowed_sources=list(rule.allowed_sources) if rule else [],
+        override_allowed=rule.override_allowed if rule else False,
+        rule_description=rule.description if rule else None,
     )
 
 

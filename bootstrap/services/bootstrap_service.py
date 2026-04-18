@@ -6,11 +6,7 @@ from typing import Optional
 
 from bootstrap.application.build_specs import run_build_specs
 from bootstrap.application.check_toolchain import run_toolchain_check
-from bootstrap.application.derive_policy import (
-    build_detected_host_facts,
-    build_policy_trace,
-    derive_site_policy,
-)
+from bootstrap.application.derive_policy import derive_policy_bundle
 from bootstrap.application.detect_packages import detect_requested_packages
 from bootstrap.application.inspect_linkage import run_linkage_inspection
 from bootstrap.core.package_registry import PACKAGES
@@ -67,16 +63,19 @@ class BootstrapService:
             compiler = detect_compiler_entry(base_env, list(config.modules_to_load))
             runtime_config = detect_site_runtime_config(config.site, base_env, config.platform)
 
-        facts = build_detected_host_facts(
+        policy_bundle = derive_policy_bundle(
             config=config,
             context=context,
             compiler=compiler,
             runtime_config=runtime_config,
             detected=detected,
             linkage=linkage,
+            specs=specs,
+            strict=strict,
         )
-        policy = derive_site_policy(config=config, facts=facts, specs=specs)
-        trace = build_policy_trace(config=config, facts=facts, policy=policy, strict=strict)
+        facts = policy_bundle.facts
+        policy = policy_bundle.policy
+        trace = policy_bundle.trace
         packages_yaml = generate_packages_yaml_from_policy(policy)
 
         if not dry_run:

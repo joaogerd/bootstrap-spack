@@ -7,6 +7,7 @@ SUPPORTED_SITE_LAYOUTS = ("spack-stack",)
 
 PolicySource = Literal["config", "detection", "policy", "override", "default", "legacy-compat"]
 PolicyConfidence = Literal["high", "medium", "low", "heuristic"]
+PolicyFieldKind = Literal["factual", "derived", "institutional", "template"]
 
 AUTHORITY_PRECEDENCE: Dict[str, int] = {
     "legacy-compat": 0,
@@ -15,6 +16,108 @@ AUTHORITY_PRECEDENCE: Dict[str, int] = {
     "detection": 300,
     "config": 400,
     "override": 500,
+}
+
+
+@dataclass(frozen=True)
+class FieldAuthorityRule:
+    key: str
+    field_kind: PolicyFieldKind
+    preferred_source: PolicySource
+    allowed_sources: List[PolicySource]
+    override_allowed: bool
+    description: str
+
+
+FIELD_AUTHORITY_RULES: Dict[str, FieldAuthorityRule] = {
+    "module_system": FieldAuthorityRule(
+        key="module_system",
+        field_kind="institutional",
+        preferred_source="config",
+        allowed_sources=["config", "override", "legacy-compat"],
+        override_allowed=False,
+        description="Module backend is an institutional site choice declared by configuration.",
+    ),
+    "compiler": FieldAuthorityRule(
+        key="compiler",
+        field_kind="factual",
+        preferred_source="detection",
+        allowed_sources=["detection", "config", "override", "legacy-compat"],
+        override_allowed=False,
+        description="Compiler policy should be anchored in observed host toolchain evidence.",
+    ),
+    "runtime.build_jobs": FieldAuthorityRule(
+        key="runtime.build_jobs",
+        field_kind="derived",
+        preferred_source="policy",
+        allowed_sources=["policy", "override", "config", "default", "legacy-compat"],
+        override_allowed=True,
+        description="Build parallelism is derived from host/runtime policy but may be explicitly overridden.",
+    ),
+    "runtime.install_tree_root": FieldAuthorityRule(
+        key="runtime.install_tree_root",
+        field_kind="institutional",
+        preferred_source="policy",
+        allowed_sources=["policy", "override", "config", "default", "legacy-compat"],
+        override_allowed=True,
+        description="Install tree location is a site policy decision that may be explicitly overridden.",
+    ),
+    "runtime.build_stage": FieldAuthorityRule(
+        key="runtime.build_stage",
+        field_kind="institutional",
+        preferred_source="policy",
+        allowed_sources=["policy", "override", "config", "default", "legacy-compat"],
+        override_allowed=True,
+        description="Build stage paths are runtime policy decisions that may be explicitly overridden.",
+    ),
+    "runtime.test_stage": FieldAuthorityRule(
+        key="runtime.test_stage",
+        field_kind="institutional",
+        preferred_source="policy",
+        allowed_sources=["policy", "override", "config", "default", "legacy-compat"],
+        override_allowed=True,
+        description="Test stage paths are runtime policy decisions that may be explicitly overridden.",
+    ),
+    "runtime.source_cache": FieldAuthorityRule(
+        key="runtime.source_cache",
+        field_kind="institutional",
+        preferred_source="policy",
+        allowed_sources=["policy", "override", "config", "default", "legacy-compat"],
+        override_allowed=True,
+        description="Source cache location is a runtime policy decision that may be explicitly overridden.",
+    ),
+    "runtime.misc_cache": FieldAuthorityRule(
+        key="runtime.misc_cache",
+        field_kind="institutional",
+        preferred_source="policy",
+        allowed_sources=["policy", "override", "config", "default", "legacy-compat"],
+        override_allowed=True,
+        description="Misc cache location is a runtime policy decision that may be explicitly overridden.",
+    ),
+    "providers.mpi": FieldAuthorityRule(
+        key="providers.mpi",
+        field_kind="derived",
+        preferred_source="policy",
+        allowed_sources=["policy", "override", "config", "default", "legacy-compat"],
+        override_allowed=True,
+        description="MPI provider is derived from validated packages and may be explicitly overridden by site policy.",
+    ),
+    "common_modules_enabled": FieldAuthorityRule(
+        key="common_modules_enabled",
+        field_kind="institutional",
+        preferred_source="policy",
+        allowed_sources=["policy", "config", "legacy-compat"],
+        override_allowed=False,
+        description="Common module enablement follows the selected site module backend.",
+    ),
+    "template.enabled": FieldAuthorityRule(
+        key="template.enabled",
+        field_kind="template",
+        preferred_source="config",
+        allowed_sources=["config", "override", "legacy-compat"],
+        override_allowed=False,
+        description="Template enablement is driven by explicit template configuration.",
+    ),
 }
 
 
@@ -276,6 +379,11 @@ class PolicyAuthority:
     overridden_by: Optional[str] = None
     supersedes_source: Optional[PolicySource] = None
     legacy_compat_used: bool = False
+    field_kind: Optional[PolicyFieldKind] = None
+    preferred_source: Optional[PolicySource] = None
+    allowed_sources: List[PolicySource] = field(default_factory=list)
+    override_allowed: bool = False
+    rule_description: Optional[str] = None
 
 
 @dataclass(frozen=True)

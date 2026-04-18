@@ -33,6 +33,7 @@ The tool now operates around explicit internal layers for:
 
 - detected host facts;
 - derived site policy;
+- policy authority;
 - policy decision trace;
 - layered artifact generation.
 
@@ -40,6 +41,7 @@ In practical terms, the project now distinguishes more clearly between:
 
 - what was observed on the host;
 - what was inferred as site policy;
+- which authority produced each important policy value;
 - why those policy decisions were taken;
 - what was rendered as final configuration files.
 
@@ -50,6 +52,15 @@ The policy trace is no longer only a flat list of messages. It now supports stru
 - rationale;
 - confidence level;
 - fallback used, when applicable.
+
+The derived policy model also carries explicit authority metadata for key decisions such as:
+
+- module backend selection;
+- compiler policy;
+- runtime policy;
+- MPI provider policy;
+- common module policy;
+- template enablement.
 
 ---
 
@@ -254,7 +265,7 @@ output:
 
 ## Internal architecture model
 
-The internal model is now organized around five semantic layers.
+The internal model is now organized around six semantic layers.
 
 ### 1. Requested configuration
 
@@ -283,7 +294,24 @@ The internal model is now organized around five semantic layers.
 - common module policy
 - template intent
 
-### 4. Policy decision trace
+### 4. Policy authority
+
+`PolicyAuthority` represents the authority that produced an important policy value.
+
+Each authority record captures:
+
+- `key`
+- `value`
+- `source`
+- `rationale`
+- `confidence`
+- `fallback_used`
+- `overridden_by`
+- `legacy_compat_used`
+
+This is the semantic layer that allows the tool to distinguish between values that came from configuration, detection, derived policy, explicit override, default behavior or legacy compatibility.
+
+### 5. Policy decision trace
 
 `PolicyDecisionTrace` records why the policy looks the way it does.
 
@@ -302,7 +330,7 @@ Each structured trace entry captures:
 - `confidence`
 - `fallback_used`
 
-### 5. Rendered artifacts
+### 6. Rendered artifacts
 
 `LayeredSpackStackArtifacts` represents the materialized YAML outputs used to populate:
 
@@ -340,6 +368,7 @@ A human-readable report with:
 - toolchain consistency summary
 - detected host facts
 - derived policy
+- policy authority
 - policy decision trace
 - structured trace entries for policy decisions
 
@@ -397,6 +426,7 @@ The project is organized around a layered internal architecture:
 Some design choices are deliberate:
 
 - detected facts and generated policy are kept separate as much as possible
+- policy authority is modeled explicitly rather than left implicit in helper behavior
 - platform-specific behavior is handled pragmatically rather than abstractly over-generalized
 - renderers are split by output artifact
 - the project favors inspectable YAML outputs over hidden implicit behavior
@@ -415,6 +445,7 @@ The current implementation is strongest in these areas:
 - transparent YAML artifacts that can be inspected and versioned
 - unit test coverage for the bootstrap core and renderer layer
 - explicit modeling of detected facts, derived policy and policy trace
+- explicit modeling of authority for important policy decisions
 - structured policy trace entries that make derivation decisions more auditable
 
 ---
@@ -431,6 +462,7 @@ Important current limitations include:
 - some generated policy is still derived automatically from detected host facts, which may need manual refinement in institutional environments
 - module system behavior can remain site-specific and sometimes surprising on real HPC machines
 - provider selection and runtime policy remain pragmatic and are still being refined in the 0.4.x line
+- override handling is now part of the semantic model, but broader controlled override flows are still being expanded
 
 ---
 
@@ -493,6 +525,7 @@ The current direction of the project points toward:
 
 - stronger policy engineering in `DerivedSitePolicy`
 - richer and more explicit derivation rules
+- richer authority modeling and controlled override handling
 - more auditable decision traces with confidence and fallback reporting
 - stronger distinction between detected host facts and final institutional policy
 - more explicit platform profiles

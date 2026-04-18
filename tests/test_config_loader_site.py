@@ -53,6 +53,49 @@ output:
     assert cfg.template.enabled is True
 
 
+def test_load_config_parses_site_policy_overrides(tmp_path: Path) -> None:
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(
+        """
+platform: linux
+modules:
+  load: []
+packages:
+  external:
+    - openmpi
+site:
+  name: linux-example
+  layout: spack-stack
+  policy_overrides:
+    providers:
+      mpi:
+        - mpich
+    runtime:
+      build_jobs: 16
+      install_tree_root: /scratch/site/spack/opt
+      build_stage:
+        - /scratch/site/spack/stage
+      test_stage: /scratch/site/spack/test
+      source_cache: /scratch/site/spack/cache/source
+      misc_cache: /scratch/site/spack/cache/misc
+output:
+  directory: .
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    cfg = load_config(str(config_file))
+
+    assert cfg.site.policy_overrides.mpi_provider == ["mpich"]
+    assert cfg.site.policy_overrides.runtime.build_jobs == 16
+    assert cfg.site.policy_overrides.runtime.install_tree_root == "/scratch/site/spack/opt"
+    assert cfg.site.policy_overrides.runtime.build_stage == ["/scratch/site/spack/stage"]
+    assert cfg.site.policy_overrides.runtime.test_stage == "/scratch/site/spack/test"
+    assert cfg.site.policy_overrides.runtime.source_cache == "/scratch/site/spack/cache/source"
+    assert cfg.site.policy_overrides.runtime.misc_cache == "/scratch/site/spack/cache/misc"
+
+
 def test_load_config_rejects_unsupported_site_layout(tmp_path: Path) -> None:
     config_file = tmp_path / "config.yaml"
     config_file.write_text(

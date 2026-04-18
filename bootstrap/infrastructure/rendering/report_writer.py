@@ -143,6 +143,15 @@ def _write_trace(fh, trace: Optional[PolicyDecisionTrace]) -> None:
         return
 
     fh.write("=== POLICY TRACE ===\n\n")
+    if trace.entries:
+        for idx, entry in enumerate(trace.entries, start=1):
+            fh.write(f"TRACE_ENTRY_{idx}=\n")
+            fh.write(f"  message={entry.message}\n")
+            fh.write(f"  source={entry.source}\n")
+            fh.write(f"  rationale={entry.rationale}\n")
+            fh.write(f"  confidence={entry.confidence}\n")
+            if entry.fallback_used:
+                fh.write(f"  fallback_used={entry.fallback_used}\n")
     if trace.decisions:
         fh.write(f"decisions={trace.decisions}\n")
     if trace.warnings:

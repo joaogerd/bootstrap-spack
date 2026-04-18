@@ -63,8 +63,14 @@ def build_policy_trace(*, config, facts: DetectedHostFacts, policy: DerivedSiteP
     decisions = [
         f"platform_family set to {facts.platform_family or 'unknown'}",
         f"strict validation {'enabled' if strict else 'disabled'}",
+        f"requested packages count={len(policy.requested_packages)}",
+        f"validated external packages count={len(policy.packages)}",
     ]
 
+    if facts.loaded_modules:
+        decisions.append(f"base modules loaded={facts.loaded_modules}")
+    if facts.optional_modules:
+        decisions.append(f"optional module candidates={facts.optional_modules}")
     if facts.module_system:
         decisions.append(f"module system set to {facts.module_system}")
     if facts.compiler is not None:
@@ -73,11 +79,17 @@ def build_policy_trace(*, config, facts: DetectedHostFacts, policy: DerivedSiteP
         decisions.append(f"runtime config derived for site {config.site.name or 'unspecified'}")
         decisions.append(f"build_jobs resolved to {facts.runtime.build_jobs}")
         decisions.append(f"install_tree_root resolved to {facts.runtime.install_tree_root}")
+        decisions.append(f"build_stage resolved to {facts.runtime.build_stage}")
+        decisions.append(f"test_stage resolved to {facts.runtime.test_stage}")
     if policy.providers:
         for virtual, provider_list in policy.providers.items():
             decisions.append(f"provider policy for {virtual} set to {provider_list}")
+    else:
+        decisions.append("no virtual providers inferred")
     if config.template.enabled:
         decisions.append(f"template policy enabled for {config.template.name or 'unnamed-template'}")
+    if policy.common_modules_enabled:
+        decisions.append(f"common modules enabled={policy.common_modules_enabled}")
 
     assumptions = []
     for spec in policy.packages.values():
@@ -90,6 +102,9 @@ def build_policy_trace(*, config, facts: DetectedHostFacts, policy: DerivedSiteP
         warnings.append("module system not explicitly modeled for this host")
     if facts.runtime is None and config.site.enabled:
         warnings.append("runtime config unavailable; site policy is incomplete")
+    unresolved = [name for name in policy.requested_packages if name not in policy.packages]
+    if unresolved:
+        warnings.append(f"requested packages without validated external policy={unresolved}")
 
     return PolicyDecisionTrace(
         decisions=decisions,

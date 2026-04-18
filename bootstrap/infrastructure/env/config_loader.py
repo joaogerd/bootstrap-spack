@@ -4,7 +4,14 @@ from typing import Any, Dict
 
 import yaml
 
-from bootstrap.domain.models import BootstrapConfig, SUPPORTED_SITE_LAYOUTS, SiteConfig, TemplateConfig
+from bootstrap.domain.models import (
+    BootstrapConfig,
+    SUPPORTED_SITE_LAYOUTS,
+    SiteConfig,
+    SitePolicyOverrides,
+    SitePolicyRuntimeOverrides,
+    TemplateConfig,
+)
 from bootstrap.shared.exceptions import ConfigError
 
 
@@ -35,6 +42,61 @@ def _require_list(name: str, value: Any) -> list[str]:
     return converted
 
 
+def _optional_string(name: str, value: Any) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError(f"{name} must be a non-empty string when provided")
+    return value.strip()
+
+
+def _optional_positive_int(name: str, value: Any) -> int | None:
+    if value is None:
+        return None
+    if not isinstance(value, int) or value <= 0:
+        raise ConfigError(f"{name} must be a positive integer when provided")
+    return value
+
+
+def _load_site_policy_overrides(raw: Dict[str, Any]) -> SitePolicyOverrides:
+    runtime = SitePolicyRuntimeOverrides(
+        build_jobs=_optional_positive_int(
+            "site.policy_overrides.runtime.build_jobs",
+            _get(raw, ["site", "policy_overrides", "runtime", "build_jobs"]),
+        ),
+        install_tree_root=_optional_string(
+            "site.policy_overrides.runtime.install_tree_root",
+            _get(raw, ["site", "policy_overrides", "runtime", "install_tree_root"]),
+        ),
+        build_stage=_require_list(
+            "site.policy_overrides.runtime.build_stage",
+            _get(raw, ["site", "policy_overrides", "runtime", "build_stage"], []),
+        ),
+        test_stage=_optional_string(
+            "site.policy_overrides.runtime.test_stage",
+            _get(raw, ["site", "policy_overrides", "runtime", "test_stage"]),
+        ),
+        source_cache=_optional_string(
+            "site.policy_overrides.runtime.source_cache",
+            _get(raw, ["site", "policy_overrides", "runtime", "source_cache"]),
+        ),
+        misc_cache=_optional_string(
+            "site.policy_overrides.runtime.misc_cache",
+            _get(raw, ["site", "policy_overrides", "runtime", "misc_cache"]),
+        ),
+    )
+
+    mpi_provider = _require_list(
+        "site.policy_overrides.providers.mpi",
+        _get(raw, ["site", "policy_overrides", "providers", "mpi"], []),
+    )
+
+    return SitePolicyOverrides(
+        mpi_provider=mpi_provider,
+        runtime=runtime,
+    )
+
+
 def _load_site_config(raw: Dict[str, Any]) -> SiteConfig:
     site_name = _get(raw, ["site", "name"])
     if site_name is not None and (not isinstance(site_name, str) or not site_name.strip()):
@@ -63,6 +125,7 @@ def _load_site_config(raw: Dict[str, Any]) -> SiteConfig:
         module_system=module_system.strip(),
         build_jobs=build_jobs,
         core_compilers=core_compilers,
+        policy_overrides=_load_site_policy_overrides(raw),
     )
 
 

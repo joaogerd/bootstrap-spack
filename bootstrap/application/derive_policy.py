@@ -8,6 +8,7 @@ from bootstrap.domain.models import (
     DetectedPackage,
     ExecutionContext,
     PackageSpec,
+    PolicyAuthority,
     PolicyDecisionTrace,
     PolicyDerivationBundle,
     PolicyTraceEntry,
@@ -47,8 +48,95 @@ def build_detected_host_facts(
     )
 
 
+def _build_policy_authority(*, config, facts: DetectedHostFacts, providers: Dict[str, list[str]]) -> Dict[str, PolicyAuthority]:
+    authority: Dict[str, PolicyAuthority] = {}
+
+    if facts.module_system:
+        authority["module_system"] = PolicyAuthority(
+            key="module_system",
+            value=facts.module_system,
+            source="config",
+            rationale="module backend declared in site configuration",
+            confidence="high",
+        )
+
+    if facts.compiler is not None:
+        authority["compiler"] = PolicyAuthority(
+            key="compiler",
+            value=facts.compiler.spec,
+            source="detection",
+            rationale="compiler entry inferred from active host toolchain",
+            confidence="medium" if facts.platform_family in {"cray", "cluster"} else "high",
+        )
+
+    if facts.runtime is not None:
+        authority["runtime.build_jobs"] = PolicyAuthority(
+            key="runtime.build_jobs",
+            value=str(facts.runtime.build_jobs),
+            source="policy",
+            rationale="build jobs derived from detected host capacity and site limits",
+            confidence="medium",
+            fallback_used="site.build_jobs" if facts.runtime.build_jobs == config.site.build_jobs else None,
+        )
+        authority["runtime.install_tree_root"] = PolicyAuthority(
+            key="runtime.install_tree_root",
+            value=facts.runtime.install_tree_root,
+            source="policy",
+            rationale="install tree root derived from detected runtime policy",
+            confidence="medium",
+        )
+        authority["runtime.build_stage"] = PolicyAuthority(
+            key="runtime.build_stage",
+            value=str(facts.runtime.build_stage),
+            source="policy",
+            rationale="build stage derived from detected scratch and temporary paths",
+            confidence="medium",
+        )
+        authority["runtime.test_stage"] = PolicyAuthority(
+            key="runtime.test_stage",
+            value=facts.runtime.test_stage,
+            source="policy",
+            rationale="test stage derived from detected scratch and temporary paths",
+            confidence="medium",
+        )
+
+    if "mpi" in providers:
+        authority["providers.mpi"] = PolicyAuthority(
+            key="providers.mpi",
+            value=str(providers["mpi"]),
+            source="policy",
+            rationale="provider chosen from validated MPI implementations using current provider selection rule",
+            confidence="medium",
+            fallback_used="preference order: openmpi -> mpich",
+        )
+
+    common_modules_enabled = [config.site.module_system] if config.site.enabled else []
+    if common_modules_enabled:
+        authority["common_modules_enabled"] = PolicyAuthority(
+            key="common_modules_enabled",
+            value=str(common_modules_enabled),
+            source="policy",
+            rationale="common module policy derived from site module backend",
+            confidence="high",
+        )
+
+    if config.template.enabled:
+        authority["template.enabled"] = PolicyAuthority(
+            key="template.enabled",
+            value=config.template.name or "unnamed-template",
+            source="config",
+            rationale="template section is enabled in bootstrap configuration",
+            confidence="high",
+        )
+
+    return authority
+
+
 def derive_site_policy(*, config, facts: DetectedHostFacts, specs: Dict[str, PackageSpec]) -> DerivedSitePolicy:
     common_modules_enabled = [config.site.module_system] if config.site.enabled else []
+    providers = derive_policy_providers(facts.packages)
+    authority = _build_policy_authority(config=config, facts=facts, providers=providers)
+
     return DerivedSitePolicy(
         site=config.site,
         template=config.template,
@@ -56,8 +144,9 @@ def derive_site_policy(*, config, facts: DetectedHostFacts, specs: Dict[str, Pac
         compiler=facts.compiler,
         requested_packages=list(config.external_packages),
         packages=dict(specs),
-        providers=derive_policy_providers(facts.packages),
+        providers=providers,
         common_modules_enabled=common_modules_enabled,
+        authority=authority,
     )
 
 
@@ -121,93 +210,15 @@ def _build_trace_entries(*, config, facts: DetectedHostFacts, policy: DerivedSit
                 confidence="medium",
             )
         )
-    if facts.module_system:
+
+    for item in policy.authority.values():
         entries.append(
             _trace_entry(
-                f"module system set to {facts.module_system}",
-                source="config",
-                rationale="module backend declared in site configuration",
-            )
-        )
-    if facts.compiler is not None:
-        entries.append(
-            _trace_entry(
-                f"compiler entry derived as {facts.compiler.spec}",
-                source="detection",
-                rationale="compiler entry inferred from active host toolchain",
-                confidence="medium" if facts.platform_family in {"cray", "cluster"} else "high",
-            )
-        )
-    if facts.runtime is not None:
-        entries.extend(
-            [
-                _trace_entry(
-                    f"runtime config derived for site {config.site.name or 'unspecified'}",
-                    source="detection",
-                    rationale="site runtime values inferred from host filesystem and environment",
-                    confidence="medium",
-                ),
-                _trace_entry(
-                    f"build_jobs resolved to {facts.runtime.build_jobs}",
-                    source="policy",
-                    rationale="build jobs derived from detected host capacity and site limits",
-                    confidence="medium",
-                    fallback_used="site.build_jobs" if facts.runtime.build_jobs == config.site.build_jobs else None,
-                ),
-                _trace_entry(
-                    f"install_tree_root resolved to {facts.runtime.install_tree_root}",
-                    source="policy",
-                    rationale="install tree root derived from detected runtime policy",
-                    confidence="medium",
-                ),
-                _trace_entry(
-                    f"build_stage resolved to {facts.runtime.build_stage}",
-                    source="policy",
-                    rationale="build stage derived from detected scratch and temporary paths",
-                    confidence="medium",
-                ),
-                _trace_entry(
-                    f"test_stage resolved to {facts.runtime.test_stage}",
-                    source="policy",
-                    rationale="test stage derived from detected scratch and temporary paths",
-                    confidence="medium",
-                ),
-            ]
-        )
-    if policy.providers:
-        for virtual, provider_list in policy.providers.items():
-            entries.append(
-                _trace_entry(
-                    f"provider policy for {virtual} set to {provider_list}",
-                    source="policy",
-                    rationale="provider chosen from validated MPI implementations using current provider selection rule",
-                    confidence="medium",
-                    fallback_used="preference order: openmpi -> mpich",
-                )
-            )
-    else:
-        entries.append(
-            _trace_entry(
-                "no virtual providers inferred",
-                source="policy",
-                rationale="no validated package matched the current provider derivation rules",
-                confidence="heuristic",
-            )
-        )
-    if config.template.enabled:
-        entries.append(
-            _trace_entry(
-                f"template policy enabled for {config.template.name or 'unnamed-template'}",
-                source="config",
-                rationale="template section is enabled in bootstrap configuration",
-            )
-        )
-    if policy.common_modules_enabled:
-        entries.append(
-            _trace_entry(
-                f"common modules enabled={policy.common_modules_enabled}",
-                source="policy",
-                rationale="common module policy derived from site module backend",
+                f"{item.key} resolved to {item.value}",
+                source=item.source,
+                rationale=item.rationale,
+                confidence=item.confidence,
+                fallback_used=item.fallback_used,
             )
         )
 

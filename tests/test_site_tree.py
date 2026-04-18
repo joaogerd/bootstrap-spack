@@ -4,6 +4,7 @@ import yaml
 
 from bootstrap.domain.models import (
     CompilerEntry,
+    DerivedSitePolicy,
     DetectedPackage,
     MpiValidationDetails,
     PackageSpec,
@@ -73,14 +74,20 @@ def test_write_site_tree_creates_layered_spack_stack_layout(tmp_path: Path) -> N
         )
     }
 
-    site_dir = write_site_tree(
-        str(tmp_path),
+    policy = DerivedSitePolicy(
         site=site,
         template=template,
+        runtime=runtime,
         compiler=compiler,
-        runtime_config=runtime,
-        detected=detected,
-        specs=specs,
+        requested_packages=["openmpi"],
+        packages=specs,
+        providers={"mpi": ["openmpi"]},
+        common_modules_enabled=["lmod"],
+    )
+
+    site_dir = write_site_tree(
+        str(tmp_path),
+        policy=policy,
     )
 
     assert site_dir is not None

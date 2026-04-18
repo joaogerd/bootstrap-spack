@@ -38,6 +38,20 @@ def _detect_target() -> str:
 
 
 def _infer_compiler_family(cc_path: str, env: Dict[str, str]) -> str:
+    pe_env = (env.get("PE_ENV") or "").strip().lower()
+    if pe_env == "gnu":
+        return "gcc"
+    if pe_env in {"cray", "cce"}:
+        return "cce"
+    if pe_env == "intel":
+        return "oneapi"
+    if pe_env in {"nvidia", "nvhpc"}:
+        return "nvhpc"
+    if pe_env == "aocc":
+        return "aocc"
+    if pe_env == "amd":
+        return "amd"
+
     basename = os.path.basename(cc_path).lower()
     result = _runner.run([cc_path, "--version"], env=env)
     text = " ".join([result.stdout, result.stderr]).lower()
@@ -54,6 +68,18 @@ def _infer_compiler_family(cc_path: str, env: Dict[str, str]) -> str:
 
 
 def _extract_version(binary: str, env: Dict[str, str]) -> str:
+    pe_env = (env.get("PE_ENV") or "").strip().lower()
+    if pe_env == "gnu":
+        for key in ("GNU_VERSION", "GCC_VERSION", "PE_GCC_LEVEL"):
+            value = (env.get(key) or "").strip()
+            if re.match(r"^\d+(?:\.\d+)*$", value):
+                return value
+    if pe_env in {"cray", "cce"}:
+        for key in ("CCE_VERSION",):
+            value = (env.get(key) or "").strip()
+            if re.match(r"^\d+(?:\.\d+)*$", value):
+                return value
+
     result = _runner.run([binary, "--version"], env=env)
     text = " ".join([result.stdout, result.stderr])
     match = re.search(r"(\d+\.\d+(?:\.\d+)?)", text)
@@ -83,11 +109,39 @@ def _pick_preferred(candidates: list[str], preferred_names: set[str]) -> Optiona
     return candidates[0] if candidates else None
 
 
+def _is_cray_env(env: Dict[str, str]) -> bool:
+    return bool((env.get("PE_ENV") or "").strip()) or bool(env.get("CRAYPE_DIR") or env.get("CRAY_SITE_LIST_DIR"))
+
+
 def detect_compiler_entry(env: Dict[str, str], loaded_modules: list[str]) -> CompilerEntry:
     cc_env = env.get("CC")
     cxx_env = env.get("CXX")
     fc_env = env.get("FC")
     f77_env = env.get("F77")
+    cray_mode = _is_cray_env(env)
+
+    if cray_mode:
+        chosen_cc = cc_env or which_in_env("cc", env)
+        chosen_cxx = cxx_env or which_in_env("CC", env) or which_in_env("c++", env)
+        chosen_fc = fc_env or which_in_env("ftn", env)
+        chosen_f77 = f77_env or chosen_fc
+        if not chosen_cc or not chosen_cxx or not chosen_fc or not chosen_f77:
+            raise DetectionError("unable to detect a complete Cray compiler wrapper toolchain (cc/CC/ftn)")
+
+        family = _infer_compiler_family(chosen_cc, env)
+        version = _extract_version(chosen_cc, env)
+        spec = f"{family}@{version}" if version != "unknown" else family
+
+        return CompilerEntry(
+            spec=spec,
+            cc=chosen_cc,
+            cxx=chosen_cxx,
+            f77=chosen_f77,
+            fc=chosen_fc,
+            operating_system=_read_os_id(),
+            target=_detect_target(),
+            modules=list(loaded_modules),
+        )
 
     cc_candidates = [cc_env] if cc_env else []
     cc_candidates += _candidate_paths(env, ["gcc", "cc", "clang"])

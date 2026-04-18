@@ -70,12 +70,29 @@ ValidationDetails = (
 
 
 @dataclass(frozen=True)
+class SitePolicyRuntimeOverrides:
+    build_jobs: Optional[int] = None
+    install_tree_root: Optional[str] = None
+    build_stage: List[str] = field(default_factory=list)
+    test_stage: Optional[str] = None
+    source_cache: Optional[str] = None
+    misc_cache: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class SitePolicyOverrides:
+    mpi_provider: List[str] = field(default_factory=list)
+    runtime: SitePolicyRuntimeOverrides = field(default_factory=SitePolicyRuntimeOverrides)
+
+
+@dataclass(frozen=True)
 class SiteConfig:
     name: Optional[str] = None
     layout: str = "spack-stack"
     module_system: str = "lmod"
     build_jobs: int = 8
     core_compilers: List[str] = field(default_factory=list)
+    policy_overrides: SitePolicyOverrides = field(default_factory=SitePolicyOverrides)
 
     @property
     def enabled(self) -> bool:

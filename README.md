@@ -64,6 +64,23 @@ The derived policy model also carries explicit authority metadata for key decisi
 - common module policy;
 - template enablement.
 
+### 0.4.0 release highlights
+
+The 0.4.0 line is considered closed as the first explicit **policy-engineering** release of the project.
+
+This release closes the transition from operational detection only into a policy-aware bootstrap workflow with:
+
+- explicit host-fact modeling;
+- explicit derived policy modeling;
+- explicit authority records for key policy fields;
+- structured trace entries for decision explainability;
+- controlled runtime and provider overrides;
+- baseline authority precedence for policy reporting;
+- authority-consistency warnings in the policy trace;
+- validation exercised on Linux, EGEON and JACI.
+
+In short, 0.4.0 is the release where the project stops being only a practical detector and becomes a semantically explicit bootstrap system.
+
 ---
 
 ## What the project does

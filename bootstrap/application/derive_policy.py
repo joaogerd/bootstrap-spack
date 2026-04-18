@@ -9,6 +9,7 @@ from bootstrap.domain.models import (
     ExecutionContext,
     PackageSpec,
     PolicyDecisionTrace,
+    PolicyDerivationBundle,
 )
 
 
@@ -110,4 +111,32 @@ def build_policy_trace(*, config, facts: DetectedHostFacts, policy: DerivedSiteP
         decisions=decisions,
         warnings=warnings,
         assumptions=sorted(set(assumptions)),
+    )
+
+
+def derive_policy_bundle(
+    *,
+    config,
+    context: ExecutionContext,
+    compiler,
+    runtime_config,
+    detected,
+    linkage,
+    specs: Dict[str, PackageSpec],
+    strict: bool,
+) -> PolicyDerivationBundle:
+    facts = build_detected_host_facts(
+        config=config,
+        context=context,
+        compiler=compiler,
+        runtime_config=runtime_config,
+        detected=detected,
+        linkage=linkage,
+    )
+    policy = derive_site_policy(config=config, facts=facts, specs=specs)
+    trace = build_policy_trace(config=config, facts=facts, policy=policy, strict=strict)
+    return PolicyDerivationBundle(
+        facts=facts,
+        policy=policy,
+        trace=trace,
     )

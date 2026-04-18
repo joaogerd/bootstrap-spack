@@ -144,6 +144,15 @@ def _write_policy(fh, policy: Optional[DerivedSitePolicy]) -> None:
             fh.write(f"    rationale={authority.rationale}\n")
             fh.write(f"    confidence={authority.confidence}\n")
             fh.write(f"    precedence_rank={authority.precedence_rank}\n")
+            if authority.field_kind:
+                fh.write(f"    field_kind={authority.field_kind}\n")
+            if authority.preferred_source:
+                fh.write(f"    preferred_source={authority.preferred_source}\n")
+            if authority.allowed_sources:
+                fh.write(f"    allowed_sources={authority.allowed_sources}\n")
+            fh.write(f"    override_allowed={authority.override_allowed}\n")
+            if authority.rule_description:
+                fh.write(f"    rule_description={authority.rule_description}\n")
             if authority.fallback_used:
                 fh.write(f"    fallback_used={authority.fallback_used}\n")
             if authority.overridden_by:

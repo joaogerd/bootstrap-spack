@@ -8,6 +8,15 @@ SUPPORTED_SITE_LAYOUTS = ("spack-stack",)
 PolicySource = Literal["config", "detection", "policy", "override", "default", "legacy-compat"]
 PolicyConfidence = Literal["high", "medium", "low", "heuristic"]
 
+AUTHORITY_PRECEDENCE: Dict[str, int] = {
+    "legacy-compat": 0,
+    "default": 100,
+    "policy": 200,
+    "detection": 300,
+    "config": 400,
+    "override": 500,
+}
+
 
 @dataclass(frozen=True)
 class CompileCheckDetails:
@@ -262,8 +271,10 @@ class PolicyAuthority:
     source: PolicySource
     rationale: str
     confidence: PolicyConfidence = "high"
+    precedence_rank: int = 0
     fallback_used: Optional[str] = None
     overridden_by: Optional[str] = None
+    supersedes_source: Optional[PolicySource] = None
     legacy_compat_used: bool = False
 
 

@@ -1,9 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass
-from typing import Dict, List
+from typing import Dict, List, Optional
 
-from bootstrap.domain.models import DetectedPackage, PackageLinkage, PackageSpec, ToolchainCheckResult
+from bootstrap.domain.models import (
+    DerivedSitePolicy,
+    DetectedHostFacts,
+    DetectedPackage,
+    PackageLinkage,
+    PackageSpec,
+    PolicyDecisionTrace,
+    ToolchainCheckResult,
+)
 
 
 def _write_header(fh, platform: str | None, modules: List[str]) -> None:
@@ -88,6 +96,62 @@ def _write_toolchain(fh, toolchain: ToolchainCheckResult) -> None:
     fh.write("\n")
 
 
+def _write_facts(fh, facts: Optional[DetectedHostFacts]) -> None:
+    if facts is None:
+        return
+
+    fh.write("=== FACTS ===\n\n")
+    fh.write(f"platform_family={facts.platform_family or ''}\n")
+    fh.write(f"module_system={facts.module_system or ''}\n")
+    fh.write(f"loaded_modules={facts.loaded_modules}\n")
+    fh.write(f"optional_modules={facts.optional_modules}\n")
+
+    if facts.compiler is not None:
+        _write_details_block(fh, "compiler_", facts.compiler)
+    if facts.runtime is not None:
+        _write_details_block(fh, "runtime_", facts.runtime)
+
+    fh.write("\n")
+
+
+def _write_policy(fh, policy: Optional[DerivedSitePolicy]) -> None:
+    if policy is None:
+        return
+
+    fh.write("=== POLICY ===\n\n")
+    fh.write(f"site_name={policy.site.name or ''}\n")
+    fh.write(f"site_layout={policy.site.layout}\n")
+    fh.write(f"requested_packages={policy.requested_packages}\n")
+    fh.write(f"providers={policy.providers}\n")
+    fh.write(f"common_modules_enabled={policy.common_modules_enabled}\n")
+
+    if policy.compiler is not None:
+        fh.write(f"policy_compiler={policy.compiler.spec}\n")
+    if policy.runtime is not None:
+        fh.write(f"policy_build_jobs={policy.runtime.build_jobs}\n")
+        fh.write(f"policy_install_tree_root={policy.runtime.install_tree_root}\n")
+    if policy.template.enabled:
+        fh.write(f"template_name={policy.template.name or ''}\n")
+        fh.write(f"template_specs={policy.template.specs}\n")
+        fh.write(f"template_compiler={policy.template.compiler or ''}\n")
+
+    fh.write("\n")
+
+
+def _write_trace(fh, trace: Optional[PolicyDecisionTrace]) -> None:
+    if trace is None:
+        return
+
+    fh.write("=== POLICY TRACE ===\n\n")
+    if trace.decisions:
+        fh.write(f"decisions={trace.decisions}\n")
+    if trace.warnings:
+        fh.write(f"warnings={trace.warnings}\n")
+    if trace.assumptions:
+        fh.write(f"assumptions={trace.assumptions}\n")
+    fh.write("\n")
+
+
 def write_detection_report(
     output_file: str,
     *,
@@ -97,8 +161,14 @@ def write_detection_report(
     linkage: Dict[str, PackageLinkage],
     specs: Dict[str, PackageSpec],
     toolchain: ToolchainCheckResult,
+    facts: Optional[DetectedHostFacts] = None,
+    policy: Optional[DerivedSitePolicy] = None,
+    trace: Optional[PolicyDecisionTrace] = None,
 ) -> None:
     with open(output_file, "w", encoding="utf-8") as fh:
         _write_header(fh, platform, modules)
         _write_packages(fh, detected, linkage, specs)
         _write_toolchain(fh, toolchain)
+        _write_facts(fh, facts)
+        _write_policy(fh, policy)
+        _write_trace(fh, trace)

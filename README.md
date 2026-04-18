@@ -1,8 +1,6 @@
 <p align="center">
-  <img src="docs/assets/logo.png" alt="bootstrap-spack logo" width="180">
+  <img src="docs/assets/logo.png" alt="bootstrap-spack logo" width="480">
 </p>
-
-<h1 align="center">bootstrap-spack</h1>
 
 <p align="center">
   Detect external HPC software stacks and generate practical Spack and spack-stack configuration artifacts.

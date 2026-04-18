@@ -122,3 +122,10 @@ output:
     config_text = (out_dir / "configs" / "sites" / "linux-example" / "config.yaml").read_text(encoding="utf-8")
     assert "install_tree" in config_text
     assert "/home/user/.spack-stack/linux-example/opt/spack" in config_text
+
+    report_text = (out_dir / "detection-report.txt").read_text(encoding="utf-8")
+    assert "=== POLICY TRACE ===" in report_text
+    assert "TRACE_ENTRY_1=" in report_text
+    assert "source=config" in report_text
+    assert "rationale=" in report_text
+    assert "confidence=" in report_text

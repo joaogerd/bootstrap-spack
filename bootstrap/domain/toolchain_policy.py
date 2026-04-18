@@ -86,6 +86,18 @@ def _infer_toolchain_tokens(*prefixes: Optional[str], mpi_family: Optional[str] 
     return sorted(tokens)
 
 
+def _prefixes_compatible(linked_prefix: Optional[str], detected_prefix: Optional[str]) -> bool:
+    if not linked_prefix or not detected_prefix:
+        return True
+    if linked_prefix == detected_prefix:
+        return True
+    if detected_prefix.startswith(linked_prefix.rstrip("/") + "/"):
+        return True
+    if linked_prefix.startswith(detected_prefix.rstrip("/") + "/"):
+        return True
+    return False
+
+
 def check_toolchain(
     packages: List[DetectedPackage],
     linkage: Dict[str, PackageLinkage],
@@ -127,13 +139,13 @@ def check_toolchain(
 
     ncc_linkage = linkage.get("netcdf-c")
     if ncc_valid and ncc_linkage:
-        if ncc_linkage.hdf5_prefix and hdf5_prefix and ncc_linkage.hdf5_prefix != hdf5_prefix:
+        if ncc_linkage.hdf5_prefix and hdf5_prefix and not _prefixes_compatible(ncc_linkage.hdf5_prefix, hdf5_prefix):
             problems.append(
                 f"NetCDF-C linkado com HDF5 em {ncc_linkage.hdf5_prefix}, "
                 f"mas HDF5 detectado em {hdf5_prefix}"
             )
 
-        if ncc_linkage.mpi_prefix and mpi_prefix and ncc_linkage.mpi_prefix != mpi_prefix:
+        if ncc_linkage.mpi_prefix and mpi_prefix and not _prefixes_compatible(ncc_linkage.mpi_prefix, mpi_prefix):
             problems.append(
                 f"NetCDF-C linkado com MPI em {ncc_linkage.mpi_prefix}, "
                 f"mas MPI detectado em {mpi_prefix}"
@@ -141,7 +153,7 @@ def check_toolchain(
 
     ncf_linkage = linkage.get("netcdf-fortran")
     if ncf_valid and ncf_linkage:
-        if ncf_linkage.netcdf_c_prefix and ncc_prefix and ncf_linkage.netcdf_c_prefix != ncc_prefix:
+        if ncf_linkage.netcdf_c_prefix and ncc_prefix and not _prefixes_compatible(ncf_linkage.netcdf_c_prefix, ncc_prefix):
             problems.append(
                 f"NetCDF-Fortran linkado com NetCDF-C em {ncf_linkage.netcdf_c_prefix}, "
                 f"mas NetCDF-C detectado em {ncc_prefix}"

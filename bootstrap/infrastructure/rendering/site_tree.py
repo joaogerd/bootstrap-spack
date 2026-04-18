@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Optional
 
 from bootstrap.domain.models import DerivedSitePolicy, LayeredSpackStackArtifacts
-from bootstrap.infrastructure.rendering.compilers_yaml import generate_compilers_yaml
-from bootstrap.infrastructure.rendering.config_yaml import generate_config_yaml
+from bootstrap.infrastructure.rendering.compilers_yaml import generate_compilers_yaml_from_policy
+from bootstrap.infrastructure.rendering.config_yaml import generate_config_yaml_from_policy
 from bootstrap.infrastructure.rendering.modules_yaml import (
     generate_common_modules_yaml_from_policy,
     generate_site_modules_yaml_from_policy,
@@ -25,25 +25,13 @@ def build_spack_stack_artifacts(*, policy: DerivedSitePolicy) -> LayeredSpackSta
             compiler=policy.template.compiler,
         )
 
-    site_compilers_yaml = generate_compilers_yaml([policy.compiler]) if policy.compiler is not None else generate_compilers_yaml([])
-    site_config_yaml = generate_config_yaml(policy.runtime) if policy.runtime is not None else generate_config_yaml(
-        type("_Runtime", (), {
-            "build_jobs": policy.site.build_jobs,
-            "install_tree_root": "",
-            "build_stage": [],
-            "test_stage": "",
-            "source_cache": "",
-            "misc_cache": "",
-        })()
-    )
-
     return LayeredSpackStackArtifacts(
         common_packages_yaml=generate_common_packages_yaml_from_policy(policy),
         common_modules_yaml=generate_common_modules_yaml_from_policy(policy),
         site_packages_yaml=generate_site_packages_yaml_from_policy(policy),
-        site_compilers_yaml=site_compilers_yaml,
+        site_compilers_yaml=generate_compilers_yaml_from_policy(policy),
         site_modules_yaml=generate_site_modules_yaml_from_policy(policy),
-        site_config_yaml=site_config_yaml,
+        site_config_yaml=generate_config_yaml_from_policy(policy),
         template_spack_yaml=template_spack_yaml,
     )
 

@@ -241,6 +241,7 @@ class DerivedSitePolicy:
     template: TemplateConfig
     runtime: Optional[SiteRuntimeConfig]
     compiler: Optional[CompilerEntry]
+    requested_packages: List[str]
     packages: Dict[str, PackageSpec]
     providers: Dict[str, List[str]] = field(default_factory=dict)
     common_modules_enabled: List[str] = field(default_factory=list)

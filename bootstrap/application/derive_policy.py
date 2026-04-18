@@ -358,6 +358,28 @@ def _build_trace_entries(*, config, facts: DetectedHostFacts, policy: DerivedSit
 
 
 
+def _build_authority_warnings(policy: DerivedSitePolicy) -> List[str]:
+    warnings: List[str] = []
+
+    for key, authority in policy.authority.items():
+        if authority.allowed_sources and authority.source not in authority.allowed_sources:
+            warnings.append(f"field '{key}' resolved from unexpected source '{authority.source}'")
+
+        if authority.source == "override" and not authority.override_allowed:
+            warnings.append(f"field '{key}' used override where override is not supported")
+
+        if authority.legacy_compat_used:
+            warnings.append(f"field '{key}' depended on legacy compatibility behavior")
+
+        if authority.source != authority.preferred_source and authority.source not in {"override", "legacy-compat"}:
+            warnings.append(
+                f"field '{key}' resolved from '{authority.source}' instead of preferred '{authority.preferred_source}'"
+            )
+
+    return warnings
+
+
+
 def build_policy_trace(*, config, facts: DetectedHostFacts, policy: DerivedSitePolicy, strict: bool) -> PolicyDecisionTrace:
     entries = _build_trace_entries(config=config, facts=facts, policy=policy, strict=strict)
     decisions = [entry.message for entry in entries]
@@ -376,6 +398,8 @@ def build_policy_trace(*, config, facts: DetectedHostFacts, policy: DerivedSiteP
     unresolved = [name for name in policy.requested_packages if name not in policy.packages]
     if unresolved:
         warnings.append(f"requested packages without validated external policy={unresolved}")
+
+    warnings.extend(_build_authority_warnings(policy))
 
     return PolicyDecisionTrace(
         decisions=decisions,

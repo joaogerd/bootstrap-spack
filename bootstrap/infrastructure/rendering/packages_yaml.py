@@ -117,3 +117,13 @@ def generate_packages_yaml(
     payload["packages"].update(common.get("packages", {}))
     payload["packages"].update(site.get("packages", {}))
     return yaml.dump(payload, sort_keys=False)
+
+
+def generate_packages_yaml_from_policy(policy: DerivedSitePolicy) -> str:
+    common = yaml.safe_load(generate_common_packages_yaml_from_policy(policy))
+    site = yaml.safe_load(generate_site_packages_yaml_from_policy(policy))
+
+    payload: Dict[str, object] = {"packages": {}}
+    payload["packages"].update(common.get("packages", {}))
+    payload["packages"].update(site.get("packages", {}))
+    return yaml.dump(payload, sort_keys=False)

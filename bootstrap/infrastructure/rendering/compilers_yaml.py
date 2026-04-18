@@ -4,7 +4,7 @@ from typing import List
 
 import yaml
 
-from bootstrap.domain.models import CompilerEntry
+from bootstrap.domain.models import CompilerEntry, DerivedSitePolicy
 
 
 def generate_compilers_yaml(compilers: List[CompilerEntry]) -> str:
@@ -30,3 +30,9 @@ def generate_compilers_yaml(compilers: List[CompilerEntry]) -> str:
             }
         )
     return yaml.dump(data, sort_keys=False)
+
+
+def generate_compilers_yaml_from_policy(policy: DerivedSitePolicy) -> str:
+    if policy.compiler is None:
+        return generate_compilers_yaml([])
+    return generate_compilers_yaml([policy.compiler])

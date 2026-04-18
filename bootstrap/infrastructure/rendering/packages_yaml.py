@@ -4,7 +4,7 @@ from typing import Dict, Optional
 
 import yaml
 
-from bootstrap.domain.models import DetectedPackage, PackageSpec
+from bootstrap.domain.models import DerivedSitePolicy, DetectedPackage, PackageSpec
 
 
 def _infer_mpi_provider(detected: Dict[str, DetectedPackage]) -> Optional[str]:
@@ -21,7 +21,9 @@ def _infer_mpi_provider(detected: Dict[str, DetectedPackage]) -> Optional[str]:
         if not pkg.validation or not pkg.validation.valid:
             continue
 
-        family = str(pkg.metadata.get("family", "")).lower()
+        details = pkg.validation.details
+        family = getattr(details, "family", "") if details is not None else ""
+        family = str(family).lower()
         if family in family_map:
             return family_map[family]
 
@@ -46,6 +48,15 @@ def generate_common_packages_yaml(detected: Dict[str, DetectedPackage]) -> str:
     return yaml.dump(data, sort_keys=False)
 
 
+def generate_common_packages_yaml_from_policy(policy: DerivedSitePolicy) -> str:
+    data: Dict[str, object] = {"packages": {}}
+    if policy.providers:
+        data["packages"]["all"] = {
+            "providers": dict(policy.providers),
+        }
+    return yaml.dump(data, sort_keys=False)
+
+
 def generate_site_packages_yaml(
     detected: Dict[str, DetectedPackage],
     specs: Dict[str, PackageSpec],
@@ -55,6 +66,29 @@ def generate_site_packages_yaml(
     for name, pkg in detected.items():
         if pkg.found and pkg.validation and pkg.validation.valid and name in specs:
             spec = specs[name]
+            data["packages"][name] = {
+                "externals": [
+                    {
+                        "spec": spec.spec,
+                        "prefix": spec.prefix,
+                    }
+                ],
+                "buildable": False,
+            }
+        else:
+            data["packages"][name] = {
+                "buildable": True,
+            }
+
+    return yaml.dump(data, sort_keys=False)
+
+
+def generate_site_packages_yaml_from_policy(policy: DerivedSitePolicy) -> str:
+    data: Dict[str, object] = {"packages": {}}
+
+    for name in policy.requested_packages:
+        spec = policy.packages.get(name)
+        if spec is not None:
             data["packages"][name] = {
                 "externals": [
                     {

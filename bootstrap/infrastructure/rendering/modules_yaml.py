@@ -4,6 +4,8 @@ from typing import List
 
 import yaml
 
+from bootstrap.domain.models import DerivedSitePolicy
+
 
 def _normalized_module_key(module_system: str) -> str:
     module_key = module_system.strip().lower() if module_system else "lmod"
@@ -24,6 +26,17 @@ def generate_common_modules_yaml(module_system: str) -> str:
     return yaml.dump(payload, sort_keys=False)
 
 
+def generate_common_modules_yaml_from_policy(policy: DerivedSitePolicy) -> str:
+    payload = {
+        "modules": {
+            "default": {
+                "enable": list(policy.common_modules_enabled),
+            }
+        }
+    }
+    return yaml.dump(payload, sort_keys=False)
+
+
 def generate_site_modules_yaml(module_system: str, core_compilers: List[str]) -> str:
     module_key = _normalized_module_key(module_system)
     payload = {"modules": {"default": {}}}
@@ -32,6 +45,14 @@ def generate_site_modules_yaml(module_system: str, core_compilers: List[str]) ->
             "core_compilers": list(core_compilers),
         }
     return yaml.dump(payload, sort_keys=False)
+
+
+def generate_site_modules_yaml_from_policy(policy: DerivedSitePolicy) -> str:
+    if policy.compiler is None:
+        return yaml.dump({"modules": {"default": {}}}, sort_keys=False)
+
+    core_compilers = list(policy.site.core_compilers) if policy.site.core_compilers else [policy.compiler.spec]
+    return generate_site_modules_yaml(policy.site.module_system, core_compilers)
 
 
 def generate_modules_yaml(module_system: str, core_compilers: List[str]) -> str:

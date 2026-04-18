@@ -23,6 +23,25 @@ Instead of manually writing everything by hand, `bootstrap-spack` inspects the h
 
 ---
 
+## Release status
+
+The current release line is **0.3.0**.
+
+This release is the first one where the project is no longer just a package detector with extra YAML output. It now has an explicit internal architecture for:
+
+- detected host facts;
+- derived site policy;
+- policy decision trace;
+- layered artifact generation.
+
+In practical terms, this means the tool can now distinguish more clearly between:
+
+- what was observed on the host;
+- what was inferred as site policy;
+- what was rendered as final configuration files.
+
+---
+
 ## What the project does
 
 The current implementation provides four main capabilities.
@@ -222,6 +241,57 @@ output:
 
 ---
 
+## Internal architecture model
+
+The internal model is now organized around five semantic layers.
+
+### 1. Requested configuration
+
+`BootstrapConfig` represents what the user asked for.
+
+### 2. Detected host facts
+
+`DetectedHostFacts` represents what the host actually exposed, including:
+
+- platform family
+- loaded modules
+- optional module candidates
+- detected compiler entry
+- validated packages
+- linkage evidence
+- detected runtime configuration
+
+### 3. Derived site policy
+
+`DerivedSitePolicy` represents the policy derived from configuration plus host facts, including:
+
+- requested packages
+- selected virtual providers
+- compiler policy
+- runtime policy
+- common module policy
+- template intent
+
+### 4. Policy decision trace
+
+`PolicyDecisionTrace` records why the policy looks the way it does, including:
+
+- decisions
+- warnings
+- assumptions
+
+### 5. Rendered artifacts
+
+`LayeredSpackStackArtifacts` represents the materialized YAML outputs used to populate:
+
+- `common`
+- `site`
+- `template`
+
+This separation is important because it allows the tool to state more clearly what was detected automatically versus what was promoted to final site policy.
+
+---
+
 ## Outputs
 
 ## Unified outputs
@@ -246,6 +316,9 @@ A human-readable report with:
 - linkage information
 - generated specs
 - toolchain consistency summary
+- detected host facts
+- derived policy
+- policy decision trace
 
 ## Layered outputs
 
@@ -293,7 +366,7 @@ A minimal template environment definition using the configured specs and optiona
 The project is organized around a layered internal architecture:
 
 - `domain` → explicit models and semantic structures
-- `application` → orchestration use cases
+- `application` → orchestration and policy derivation use cases
 - `infrastructure` → shell execution, module handling, validation, rendering and detection
 - `services` → high-level bootstrap flow
 - `interfaces` → CLI and presentation
@@ -304,6 +377,7 @@ Some design choices are deliberate:
 - platform-specific behavior is handled pragmatically rather than abstractly over-generalized
 - renderers are split by output artifact
 - the project favors inspectable YAML outputs over hidden implicit behavior
+- real-machine validation is treated as first-class feedback for the implementation
 
 ---
 
@@ -317,6 +391,7 @@ The current implementation is strongest in these areas:
 - layered spack-stack-style output generation
 - transparent YAML artifacts that can be inspected and versioned
 - unit test coverage for the bootstrap core and renderer layer
+- explicit modeling of detected facts, derived policy and policy trace
 
 ---
 
@@ -331,6 +406,24 @@ Important current limitations include:
 - layered output is a practical base for spack-stack-style layouts, not a complete replacement for the full upstream spack-stack project
 - some generated policy is still derived automatically from detected host facts, which may need manual refinement in institutional environments
 - module system behavior can remain site-specific and sometimes surprising on real HPC machines
+
+---
+
+## Validation status
+
+The current release line has been exercised in real environments including:
+
+- EGEON
+- JACI
+- Linux local environment without modules
+
+The automated test suite is also passing.
+
+A practical way to interpret support maturity is:
+
+- **validated in real environment** → exercised on an actual machine
+- **validated by test suite** → covered by automated tests
+- **heuristic** → supported by design but still dependent on environment-specific assumptions
 
 ---
 
@@ -353,6 +446,7 @@ The project includes focused unit tests for:
 - site tree generation
 - command runner behavior
 - configuration loading for layered site/template flows
+- bootstrap service integration
 
 ---
 
@@ -372,7 +466,7 @@ mypy bootstrap
 
 The current direction of the project points toward:
 
-- stronger separation between detected host facts and generated site policy
+- stronger distinction between detected host facts and final institutional policy
 - richer layered `common / site / template` generation
 - more explicit platform profiles
 - more robust compiler and runtime modeling for heterogeneous HPC systems

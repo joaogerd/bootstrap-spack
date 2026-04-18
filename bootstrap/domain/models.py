@@ -248,10 +248,20 @@ class DerivedSitePolicy:
 
 
 @dataclass(frozen=True)
+class PolicyTraceEntry:
+    message: str
+    source: str
+    rationale: str
+    confidence: str = "high"
+    fallback_used: Optional[str] = None
+
+
+@dataclass(frozen=True)
 class PolicyDecisionTrace:
     decisions: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     assumptions: List[str] = field(default_factory=list)
+    entries: List[PolicyTraceEntry] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

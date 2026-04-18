@@ -25,20 +25,31 @@ Instead of manually writing everything by hand, `bootstrap-spack` inspects the h
 
 ## Release status
 
-The current release line is **0.3.0**.
+The current release line is **0.4.0**.
 
-This release is the first one where the project is no longer just a package detector with extra YAML output. It now has an explicit internal architecture for:
+This release builds on the 0.3.0 architectural split and moves the project into its first **policy engineering** phase.
+
+The tool now operates around explicit internal layers for:
 
 - detected host facts;
 - derived site policy;
 - policy decision trace;
 - layered artifact generation.
 
-In practical terms, this means the tool can now distinguish more clearly between:
+In practical terms, the project now distinguishes more clearly between:
 
 - what was observed on the host;
 - what was inferred as site policy;
+- why those policy decisions were taken;
 - what was rendered as final configuration files.
+
+The policy trace is no longer only a flat list of messages. It now supports structured trace entries that capture:
+
+- decision message;
+- source of the decision;
+- rationale;
+- confidence level;
+- fallback used, when applicable.
 
 ---
 
@@ -274,11 +285,22 @@ The internal model is now organized around five semantic layers.
 
 ### 4. Policy decision trace
 
-`PolicyDecisionTrace` records why the policy looks the way it does, including:
+`PolicyDecisionTrace` records why the policy looks the way it does.
 
-- decisions
+The trace now contains:
+
+- decision messages
 - warnings
 - assumptions
+- structured trace entries
+
+Each structured trace entry captures:
+
+- `message`
+- `source`
+- `rationale`
+- `confidence`
+- `fallback_used`
 
 ### 5. Rendered artifacts
 
@@ -319,6 +341,7 @@ A human-readable report with:
 - detected host facts
 - derived policy
 - policy decision trace
+- structured trace entries for policy decisions
 
 ## Layered outputs
 
@@ -392,6 +415,7 @@ The current implementation is strongest in these areas:
 - transparent YAML artifacts that can be inspected and versioned
 - unit test coverage for the bootstrap core and renderer layer
 - explicit modeling of detected facts, derived policy and policy trace
+- structured policy trace entries that make derivation decisions more auditable
 
 ---
 
@@ -406,6 +430,7 @@ Important current limitations include:
 - layered output is a practical base for spack-stack-style layouts, not a complete replacement for the full upstream spack-stack project
 - some generated policy is still derived automatically from detected host facts, which may need manual refinement in institutional environments
 - module system behavior can remain site-specific and sometimes surprising on real HPC machines
+- provider selection and runtime policy remain pragmatic and are still being refined in the 0.4.x line
 
 ---
 
@@ -466,10 +491,11 @@ mypy bootstrap
 
 The current direction of the project points toward:
 
+- stronger policy engineering in `DerivedSitePolicy`
+- richer and more explicit derivation rules
+- more auditable decision traces with confidence and fallback reporting
 - stronger distinction between detected host facts and final institutional policy
-- richer layered `common / site / template` generation
 - more explicit platform profiles
-- more robust compiler and runtime modeling for heterogeneous HPC systems
 - broader package support and additional validation backends
 - stronger integration-style tests for real bootstrap flows
 

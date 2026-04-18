@@ -255,6 +255,13 @@ class PolicyDecisionTrace:
 
 
 @dataclass(frozen=True)
+class PolicyDerivationBundle:
+    facts: DetectedHostFacts
+    policy: DerivedSitePolicy
+    trace: PolicyDecisionTrace
+
+
+@dataclass(frozen=True)
 class BootstrapResult:
     config_path: str
     platform: Optional[str]

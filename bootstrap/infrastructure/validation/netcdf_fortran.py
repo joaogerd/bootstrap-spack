@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 from bootstrap.domain.models import NetcdfFortranValidationDetails, ValidationResult
 from bootstrap.infrastructure.validation.common import (
@@ -12,7 +12,13 @@ from bootstrap.infrastructure.validation.common import (
 )
 
 
-def _resolve_fortran_config(tool_paths: Dict[str, str], env: Dict[str, str]) -> Tuple[str | None, str, str, str, str]:
+def _compiler_from_config(config_tool: str, env: Dict[str, str]) -> Optional[str]:
+    fc_res = run_cmd([config_tool, "--fc"], env)
+    compiler = fc_res.stdout.strip()
+    return compiler or None
+
+
+def _resolve_fortran_config(tool_paths: Dict[str, str], env: Dict[str, str]) -> Tuple[str | None, str, str, str, str, str | None]:
     nf_config = tool_paths.get("nf-config")
     if nf_config:
         prefix_res = run_cmd([nf_config, "--prefix"], env)
@@ -25,16 +31,17 @@ def _resolve_fortran_config(tool_paths: Dict[str, str], env: Dict[str, str]) -> 
             version_res.stdout.strip(),
             fflags_res.stdout.strip(),
             flibs_res.stdout.strip(),
+            _compiler_from_config(nf_config, env),
         )
 
     nc_config = tool_paths.get("nc-config")
     if not nc_config:
-        return None, "", "", "", ""
+        return None, "", "", "", "", None
 
     has_fortran_res = run_cmd([nc_config, "--has-fortran"], env)
     has_fortran_text = " ".join([has_fortran_res.stdout or "", has_fortran_res.stderr or ""]).lower()
     if "yes" not in has_fortran_text:
-        return None, "", "", "", ""
+        return None, "", "", "", "", None
 
     prefix_res = run_cmd([nc_config, "--prefix"], env)
     version_res = run_cmd([nc_config, "--version"], env)
@@ -46,15 +53,16 @@ def _resolve_fortran_config(tool_paths: Dict[str, str], env: Dict[str, str]) -> 
         version_res.stdout.strip(),
         fflags_res.stdout.strip(),
         flibs_res.stdout.strip(),
+        _compiler_from_config(nc_config, env),
     )
 
 
 def validate_netcdf_fortran(tool_paths: Dict[str, str], env: Dict[str, str], strict: bool) -> ValidationResult:
-    config_tool, prefix, version_line, fflags, flibs = _resolve_fortran_config(tool_paths, env)
+    config_tool, prefix, version_line, fflags, flibs, declared_compiler = _resolve_fortran_config(tool_paths, env)
     if not config_tool:
         return ValidationResult(valid=False, reason="nf-config or nc-config with Fortran support not found")
 
-    compiler = select_fortran_compiler(env)
+    compiler = declared_compiler or select_fortran_compiler(env)
 
     compile_result = None
     if strict:

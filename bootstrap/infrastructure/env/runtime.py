@@ -30,6 +30,12 @@ def build_clean_env(base_env: Optional[Dict[str, str]] = None) -> Dict[str, str]
         "LANG",
         "LC_ALL",
         "TMPDIR",
+        "GNU_VERSION",
+        "GCC_VERSION",
+        "CCE_VERSION",
+        "INTEL_VERSION",
+        "NVHPC_VERSION",
+        "AOCC_VERSION",
     ]
 
     clean: Dict[str, str] = {}

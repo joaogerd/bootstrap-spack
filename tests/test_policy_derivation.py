@@ -1,8 +1,8 @@
 from bootstrap.application.derive_policy import build_policy_trace, derive_site_policy
 from bootstrap.domain.models import (
+    AUTHORITY_PRECEDENCE,
     BootstrapConfig,
     CompilerEntry,
-    DerivedSitePolicy,
     DetectedHostFacts,
     PackageSpec,
     SiteConfig,
@@ -85,8 +85,15 @@ def test_derive_site_policy_applies_controlled_overrides() -> None:
     assert policy.runtime.build_jobs == 16
     assert policy.runtime.install_tree_root == "/scratch/custom/opt/spack"
     assert policy.runtime.build_stage == ["/scratch/custom/stage"]
+
     assert policy.authority["providers.mpi"].source == "override"
     assert policy.authority["providers.mpi"].overridden_by == "site.policy_overrides.providers.mpi"
+    assert policy.authority["providers.mpi"].supersedes_source == "policy"
+    assert policy.authority["providers.mpi"].precedence_rank == AUTHORITY_PRECEDENCE["override"]
+
     assert policy.authority["runtime.build_jobs"].source == "override"
     assert policy.authority["runtime.build_jobs"].overridden_by == "site.policy_overrides.runtime.build_jobs"
+    assert policy.authority["runtime.build_jobs"].supersedes_source == "policy"
+    assert policy.authority["runtime.build_jobs"].precedence_rank == AUTHORITY_PRECEDENCE["override"]
+
     assert any(entry.source == "override" for entry in trace.entries)

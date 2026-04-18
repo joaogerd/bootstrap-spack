@@ -18,7 +18,7 @@ from bootstrap.domain.models import BootstrapResult, ExecutionContext
 from bootstrap.infrastructure.compiler.detector import detect_compiler_entry
 from bootstrap.infrastructure.env.config_loader import load_config
 from bootstrap.infrastructure.modules.module_system import load_base_modules
-from bootstrap.infrastructure.rendering.packages_yaml import generate_packages_yaml
+from bootstrap.infrastructure.rendering.packages_yaml import generate_packages_yaml_from_policy
 from bootstrap.infrastructure.rendering.report_writer import write_detection_report
 from bootstrap.infrastructure.rendering.site_tree import write_site_tree
 from bootstrap.infrastructure.site.runtime_config import detect_site_runtime_config
@@ -60,7 +60,6 @@ class BootstrapService:
         linkage = run_linkage_inspection(detected=detected, context=context)
         toolchain = run_toolchain_check(detected=detected, linkage=linkage)
         specs = run_build_specs(detected=detected, linkage=linkage)
-        packages_yaml = generate_packages_yaml(detected, specs)
 
         compiler = None
         runtime_config = None
@@ -78,6 +77,7 @@ class BootstrapService:
         )
         policy = derive_site_policy(config=config, facts=facts, specs=specs)
         trace = build_policy_trace(config=config, facts=facts, policy=policy, strict=strict)
+        packages_yaml = generate_packages_yaml_from_policy(policy)
 
         if not dry_run:
             logger.info("Writing packages.yaml to %s", output_yaml)
@@ -93,6 +93,9 @@ class BootstrapService:
                 linkage=linkage,
                 specs=specs,
                 toolchain=toolchain,
+                facts=facts,
+                policy=policy,
+                trace=trace,
             )
 
             if config.site.enabled and compiler is not None and runtime_config is not None:

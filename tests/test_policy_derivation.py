@@ -90,10 +90,23 @@ def test_derive_site_policy_applies_controlled_overrides() -> None:
     assert policy.authority["providers.mpi"].overridden_by == "site.policy_overrides.providers.mpi"
     assert policy.authority["providers.mpi"].supersedes_source == "policy"
     assert policy.authority["providers.mpi"].precedence_rank == AUTHORITY_PRECEDENCE["override"]
+    assert policy.authority["providers.mpi"].field_kind == "derived"
+    assert policy.authority["providers.mpi"].preferred_source == "policy"
+    assert policy.authority["providers.mpi"].override_allowed is True
+    assert "override" in policy.authority["providers.mpi"].allowed_sources
 
     assert policy.authority["runtime.build_jobs"].source == "override"
     assert policy.authority["runtime.build_jobs"].overridden_by == "site.policy_overrides.runtime.build_jobs"
     assert policy.authority["runtime.build_jobs"].supersedes_source == "policy"
     assert policy.authority["runtime.build_jobs"].precedence_rank == AUTHORITY_PRECEDENCE["override"]
+    assert policy.authority["runtime.build_jobs"].field_kind == "derived"
+    assert policy.authority["runtime.build_jobs"].preferred_source == "policy"
+    assert policy.authority["runtime.build_jobs"].override_allowed is True
+    assert "override" in policy.authority["runtime.build_jobs"].allowed_sources
+
+    assert policy.authority["compiler"].field_kind == "factual"
+    assert policy.authority["compiler"].preferred_source == "detection"
+    assert policy.authority["compiler"].override_allowed is False
+    assert policy.authority["compiler"].source == "detection"
 
     assert any(entry.source == "override" for entry in trace.entries)

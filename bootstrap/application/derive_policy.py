@@ -9,13 +9,18 @@ from bootstrap.domain.models import (
     DetectedHostFacts,
     DetectedPackage,
     ExecutionContext,
+    ExternalPackagePolicy,
+    ModulePolicy,
     PackageSpec,
     PolicyAuthority,
     PolicyDecisionTrace,
     PolicyDerivationBundle,
     PolicySource,
     PolicyTraceEntry,
+    ProviderPolicy,
+    RuntimePolicy,
     SiteRuntimeConfig,
+    TemplatePolicy,
 )
 
 
@@ -109,6 +114,91 @@ def _apply_provider_overrides(config, providers: Dict[str, list[str]]) -> Dict[s
     if override_mpi:
         updated["mpi"] = override_mpi
     return updated
+
+
+
+def _build_external_package_policy(
+    requested_packages: List[str],
+    specs: Dict[str, PackageSpec],
+) -> Dict[str, ExternalPackagePolicy]:
+    policies: Dict[str, ExternalPackagePolicy] = {}
+
+    for name in requested_packages:
+        spec = specs.get(name)
+        if spec is not None:
+            policies[name] = ExternalPackagePolicy(
+                package=name,
+                requested=True,
+                spec=spec,
+                buildable=False,
+                source="policy",
+                status="validated-external",
+            )
+        else:
+            policies[name] = ExternalPackagePolicy(
+                package=name,
+                requested=True,
+                spec=None,
+                buildable=True,
+                source="policy",
+                status="unresolved",
+            )
+
+    return policies
+
+
+
+def _build_provider_policy(providers: Dict[str, list[str]]) -> ProviderPolicy:
+    return ProviderPolicy(providers=dict(providers))
+
+
+
+def _build_module_policy(config, compiler, common_modules_enabled: List[str]) -> ModulePolicy:
+    site_core_compilers = list(config.site.core_compilers)
+    if not site_core_compilers and compiler is not None:
+        site_core_compilers = [compiler.spec]
+
+    return ModulePolicy(
+        backend=config.site.module_system if config.site.enabled else None,
+        common_enabled=list(common_modules_enabled),
+        site_core_compilers=site_core_compilers,
+    )
+
+
+
+def _build_runtime_policy(config, runtime: Optional[SiteRuntimeConfig]) -> Optional[RuntimePolicy]:
+    if runtime is None:
+        return None
+
+    overrides = config.site.policy_overrides.runtime
+    overridden_fields: List[str] = []
+    if overrides.build_jobs is not None:
+        overridden_fields.append("runtime.build_jobs")
+    if overrides.install_tree_root:
+        overridden_fields.append("runtime.install_tree_root")
+    if overrides.build_stage:
+        overridden_fields.append("runtime.build_stage")
+    if overrides.test_stage:
+        overridden_fields.append("runtime.test_stage")
+    if overrides.source_cache:
+        overridden_fields.append("runtime.source_cache")
+    if overrides.misc_cache:
+        overridden_fields.append("runtime.misc_cache")
+
+    return RuntimePolicy(
+        config=runtime,
+        overridden_fields=overridden_fields,
+    )
+
+
+
+def _build_template_policy(config) -> TemplatePolicy:
+    return TemplatePolicy(
+        enabled=config.template.enabled,
+        name=config.template.name,
+        specs=list(config.template.specs),
+        compiler=config.template.compiler,
+    )
 
 
 
@@ -266,6 +356,11 @@ def derive_site_policy(*, config, facts: DetectedHostFacts, specs: Dict[str, Pac
     providers = _apply_provider_overrides(config, derive_policy_providers(facts.packages))
     runtime = _apply_runtime_overrides(config, facts.runtime)
     authority = _build_policy_authority(config=config, facts=facts, providers=providers, runtime=runtime)
+    external_packages = _build_external_package_policy(list(config.external_packages), specs)
+    provider_policy = _build_provider_policy(providers)
+    module_policy = _build_module_policy(config, facts.compiler, common_modules_enabled)
+    runtime_policy = _build_runtime_policy(config, runtime)
+    template_policy = _build_template_policy(config)
 
     return DerivedSitePolicy(
         site=config.site,
@@ -276,6 +371,11 @@ def derive_site_policy(*, config, facts: DetectedHostFacts, specs: Dict[str, Pac
         packages=dict(specs),
         providers=providers,
         common_modules_enabled=common_modules_enabled,
+        external_packages=external_packages,
+        provider_policy=provider_policy,
+        module_policy=module_policy,
+        runtime_policy=runtime_policy,
+        template_policy=template_policy,
         authority=authority,
     )
 
@@ -395,7 +495,7 @@ def build_policy_trace(*, config, facts: DetectedHostFacts, policy: DerivedSiteP
         warnings.append("module system not explicitly modeled for this host")
     if facts.runtime is None and config.site.enabled:
         warnings.append("runtime config unavailable; site policy is incomplete")
-    unresolved = [name for name in policy.requested_packages if name not in policy.packages]
+    unresolved = [name for name, package_policy in policy.external_packages.items() if package_policy.status == "unresolved"]
     if unresolved:
         warnings.append(f"requested packages without validated external policy={unresolved}")
 

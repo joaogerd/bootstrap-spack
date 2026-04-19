@@ -122,18 +122,33 @@ def _write_policy(fh, policy: Optional[DerivedSitePolicy]) -> None:
     fh.write(f"site_name={policy.site.name or ''}\n")
     fh.write(f"site_layout={policy.site.layout}\n")
     fh.write(f"requested_packages={policy.requested_packages}\n")
-    fh.write(f"providers={policy.providers}\n")
-    fh.write(f"common_modules_enabled={policy.common_modules_enabled}\n")
+    fh.write(f"providers={policy.provider_policy.providers}\n")
+    fh.write(f"common_modules_enabled={policy.module_policy.common_enabled}\n")
+    fh.write(f"module_backend={policy.module_policy.backend or ''}\n")
+    fh.write(f"site_core_compilers={policy.module_policy.site_core_compilers}\n")
 
     if policy.compiler is not None:
         fh.write(f"policy_compiler={policy.compiler.spec}\n")
-    if policy.runtime is not None:
-        fh.write(f"policy_build_jobs={policy.runtime.build_jobs}\n")
-        fh.write(f"policy_install_tree_root={policy.runtime.install_tree_root}\n")
-    if policy.template.enabled:
-        fh.write(f"template_name={policy.template.name or ''}\n")
-        fh.write(f"template_specs={policy.template.specs}\n")
-        fh.write(f"template_compiler={policy.template.compiler or ''}\n")
+    if policy.runtime_policy is not None and policy.runtime_policy.config is not None:
+        fh.write(f"policy_build_jobs={policy.runtime_policy.config.build_jobs}\n")
+        fh.write(f"policy_install_tree_root={policy.runtime_policy.config.install_tree_root}\n")
+        fh.write(f"policy_runtime_overrides={policy.runtime_policy.overridden_fields}\n")
+    if policy.template_policy.enabled:
+        fh.write(f"template_name={policy.template_policy.name or ''}\n")
+        fh.write(f"template_specs={policy.template_policy.specs}\n")
+        fh.write(f"template_compiler={policy.template_policy.compiler or ''}\n")
+
+    if policy.external_packages:
+        fh.write("\nPOLICY EXTERNAL PACKAGES\n")
+        for name, package_policy in policy.external_packages.items():
+            fh.write(f"  {name}=\n")
+            fh.write(f"    requested={package_policy.requested}\n")
+            fh.write(f"    status={package_policy.status}\n")
+            fh.write(f"    buildable={package_policy.buildable}\n")
+            fh.write(f"    source={package_policy.source}\n")
+            if package_policy.spec is not None:
+                fh.write(f"    spec={package_policy.spec.spec}\n")
+                fh.write(f"    prefix={package_policy.spec.prefix}\n")
 
     if policy.authority:
         fh.write("\nPOLICY AUTHORITY\n")

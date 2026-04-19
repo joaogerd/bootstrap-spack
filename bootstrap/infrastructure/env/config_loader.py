@@ -9,6 +9,7 @@ from bootstrap.domain.models import (
     SUPPORTED_SITE_LAYOUTS,
     SiteConfig,
     SitePolicyOverrides,
+    SitePolicyPlatformOverrides,
     SitePolicyRuntimeOverrides,
     TemplateConfig,
 )
@@ -86,6 +87,17 @@ def _load_site_policy_overrides(raw: Dict[str, Any]) -> SitePolicyOverrides:
         ),
     )
 
+    platform = SitePolicyPlatformOverrides(
+        operating_system=_optional_string(
+            "site.policy_overrides.platform.operating_system",
+            _get(raw, ["site", "policy_overrides", "platform", "operating_system"]),
+        ),
+        target=_optional_string(
+            "site.policy_overrides.platform.target",
+            _get(raw, ["site", "policy_overrides", "platform", "target"]),
+        ),
+    )
+
     mpi_provider = _require_list(
         "site.policy_overrides.providers.mpi",
         _get(raw, ["site", "policy_overrides", "providers", "mpi"], []),
@@ -94,6 +106,7 @@ def _load_site_policy_overrides(raw: Dict[str, Any]) -> SitePolicyOverrides:
     return SitePolicyOverrides(
         mpi_provider=mpi_provider,
         runtime=runtime,
+        platform=platform,
     )
 
 

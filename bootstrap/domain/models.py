@@ -47,6 +47,22 @@ FIELD_AUTHORITY_RULES: Dict[str, FieldAuthorityRule] = {
         override_allowed=False,
         description="Compiler policy should be anchored in observed host toolchain evidence.",
     ),
+    "platform.operating_system": FieldAuthorityRule(
+        key="platform.operating_system",
+        field_kind="derived",
+        preferred_source="detection",
+        allowed_sources=["detection", "override", "config", "legacy-compat"],
+        override_allowed=True,
+        description="Operating system policy should default to detected platform facts and may be explicitly overridden.",
+    ),
+    "platform.target": FieldAuthorityRule(
+        key="platform.target",
+        field_kind="derived",
+        preferred_source="detection",
+        allowed_sources=["detection", "override", "config", "legacy-compat"],
+        override_allowed=True,
+        description="Platform target policy should default to detected host architecture facts and may be explicitly overridden.",
+    ),
     "runtime.build_jobs": FieldAuthorityRule(
         key="runtime.build_jobs",
         field_kind="derived",
@@ -183,6 +199,16 @@ ValidationDetails = (
 
 
 @dataclass(frozen=True)
+class PlatformFacts:
+    platform: str
+    operating_system: str
+    target: str
+    source: str
+    raw_operating_system: Optional[str] = None
+    raw_target: Optional[str] = None
+
+
+@dataclass(frozen=True)
 class SitePolicyRuntimeOverrides:
     build_jobs: Optional[int] = None
     install_tree_root: Optional[str] = None
@@ -193,9 +219,16 @@ class SitePolicyRuntimeOverrides:
 
 
 @dataclass(frozen=True)
+class SitePolicyPlatformOverrides:
+    operating_system: Optional[str] = None
+    target: Optional[str] = None
+
+
+@dataclass(frozen=True)
 class SitePolicyOverrides:
     mpi_provider: List[str] = field(default_factory=list)
     runtime: SitePolicyRuntimeOverrides = field(default_factory=SitePolicyRuntimeOverrides)
+    platform: SitePolicyPlatformOverrides = field(default_factory=SitePolicyPlatformOverrides)
 
 
 @dataclass(frozen=True)
@@ -366,6 +399,7 @@ class DetectedHostFacts:
     packages: Dict[str, DetectedPackage]
     linkage: Dict[str, PackageLinkage]
     runtime: Optional[SiteRuntimeConfig]
+    platform_facts: Optional[PlatformFacts] = None
 
 
 @dataclass(frozen=True)
@@ -439,6 +473,9 @@ class DerivedSitePolicy:
     runtime_policy: Optional[RuntimePolicy] = None
     template_policy: TemplatePolicy = field(default_factory=lambda: TemplatePolicy(enabled=False))
     authority: Dict[str, PolicyAuthority] = field(default_factory=dict)
+    policy_platform: Optional[str] = None
+    policy_operating_system: Optional[str] = None
+    policy_target: Optional[str] = None
 
 
 @dataclass(frozen=True)

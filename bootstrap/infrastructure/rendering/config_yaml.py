@@ -23,11 +23,13 @@ def generate_config_yaml(config: SiteRuntimeConfig) -> str:
 
 def generate_config_yaml_from_policy(policy: DerivedSitePolicy) -> str:
     runtime_policy = policy.runtime_policy
-    if runtime_policy is None or runtime_policy.config is None:
-        payload = {
-            "config": {
-                "build_jobs": int(policy.site.build_jobs),
-            }
+    if runtime_policy is not None and runtime_policy.config is not None:
+        return generate_config_yaml(runtime_policy.config)
+    if policy.runtime is not None:
+        return generate_config_yaml(policy.runtime)
+    payload = {
+        "config": {
+            "build_jobs": int(policy.site.build_jobs),
         }
-        return yaml.dump(payload, sort_keys=False)
-    return generate_config_yaml(runtime_policy.config)
+    }
+    return yaml.dump(payload, sort_keys=False)

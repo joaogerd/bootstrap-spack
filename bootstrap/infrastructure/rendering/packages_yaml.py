@@ -50,9 +50,10 @@ def generate_common_packages_yaml(detected: Dict[str, DetectedPackage]) -> str:
 
 def generate_common_packages_yaml_from_policy(policy: DerivedSitePolicy) -> str:
     data: Dict[str, object] = {"packages": {}}
-    if policy.providers:
+    providers = dict(policy.provider_policy.providers)
+    if providers:
         data["packages"]["all"] = {
-            "providers": dict(policy.providers),
+            "providers": providers,
         }
     return yaml.dump(data, sort_keys=False)
 
@@ -87,20 +88,24 @@ def generate_site_packages_yaml_from_policy(policy: DerivedSitePolicy) -> str:
     data: Dict[str, object] = {"packages": {}}
 
     for name in policy.requested_packages:
-        spec = policy.packages.get(name)
-        if spec is not None:
+        package_policy = policy.external_packages.get(name)
+        if package_policy is None:
+            data["packages"][name] = {"buildable": True}
+            continue
+
+        if package_policy.spec is not None:
             data["packages"][name] = {
                 "externals": [
                     {
-                        "spec": spec.spec,
-                        "prefix": spec.prefix,
+                        "spec": package_policy.spec.spec,
+                        "prefix": package_policy.spec.prefix,
                     }
                 ],
-                "buildable": False,
+                "buildable": package_policy.buildable,
             }
         else:
             data["packages"][name] = {
-                "buildable": True,
+                "buildable": package_policy.buildable,
             }
 
     return yaml.dump(data, sort_keys=False)

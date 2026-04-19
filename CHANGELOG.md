@@ -1,5 +1,117 @@
 # Changelog
 
+## [0.4.0] - 2026-04-18
+
+### Added
+
+- Explicit policy-engineering architecture centered on:
+  - `DetectedHostFacts`
+  - `DerivedSitePolicy`
+  - `PolicyDecisionTrace`
+  - `PolicyAuthority`
+  - `PolicyDerivationBundle`
+- Structured policy trace entries with:
+  - `message`
+  - `source`
+  - `rationale`
+  - `confidence`
+  - `fallback_used`
+- Explicit policy authority metadata for important derived fields, including:
+  - source
+  - rationale
+  - confidence
+  - precedence rank
+  - fallback usage
+  - override attribution
+  - superseded source
+  - legacy compatibility usage
+- Controlled site policy overrides via YAML under:
+  - `site.policy_overrides.providers`
+  - `site.policy_overrides.runtime`
+- Authority precedence model for policy reporting:
+  - `legacy-compat`
+  - `default`
+  - `policy`
+  - `detection`
+  - `config`
+  - `override`
+- Authority consistency warnings in policy trace when:
+  - an unexpected source resolves a field
+  - override is used where not allowed
+  - legacy compatibility affects a field
+  - the preferred source is not the one that won
+- Report sections for:
+  - detected host facts
+  - derived policy
+  - policy authority
+  - policy trace
+  - structured trace entries
+
+### Changed
+
+- Evolved the project from “explicit architecture” into the first real **policy-engineering** release line
+- Refactored policy derivation into a clearer application-layer workflow
+- Moved core generation flow further toward **policy-driven rendering**
+- Updated unified and layered output generation to rely more directly on derived policy objects
+- Improved semantic distinction between:
+  - detected host facts
+  - derived site policy
+  - rendered artifacts
+- Improved release narrative and README to reflect the new 0.4.x direction
+- Strengthened auditability of the bootstrap result by exposing:
+  - facts
+  - policy
+  - authority
+  - trace
+
+### Fixed
+
+- Reduced silent decision-making in policy derivation by making source and rationale explicit
+- Reduced hidden override behavior by promoting override to a formal authority layer
+- Improved traceability of runtime and MPI provider decisions
+- Improved consistency between real project state, versioning, and public documentation
+
+### Validation
+
+- Verified in real environments including:
+  - generic Linux
+  - EGEON
+  - JACI
+- Automated test suite passing for:
+  - bootstrap service integration
+  - config loading
+  - package detection
+  - renderer flow
+  - site tree generation
+  - runtime config
+  - policy/authority related behavior
+
+### Current status
+
+This release marks the first version where the project is not only operationally useful, but also **semantically explicit** in how it derives site policy.
+
+The bootstrap now works around a clear internal flow:
+
+- requested configuration
+- detected host facts
+- derived site policy
+- policy authority
+- policy trace
+- rendered artifacts
+
+It also supports controlled override handling for central runtime and provider policy decisions.
+
+### Focus of the 0.4.x line
+
+The 0.4.x line is focused on **policy engineering**, especially:
+
+- making derivation rules more explicit
+- improving authority semantics
+- expanding controlled overrides
+- reducing legacy compatibility residue
+- improving explainability and auditability of site policy decisions
+
+
 ## [0.3.0] - 2026-04-18
 
 ### Added

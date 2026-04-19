@@ -50,7 +50,7 @@ def generate_common_packages_yaml(detected: Dict[str, DetectedPackage]) -> str:
 
 def generate_common_packages_yaml_from_policy(policy: DerivedSitePolicy) -> str:
     data: Dict[str, object] = {"packages": {}}
-    providers = dict(policy.provider_policy.providers)
+    providers = dict(policy.provider_policy.providers) if policy.provider_policy.providers else dict(policy.providers)
     if providers:
         data["packages"]["all"] = {
             "providers": providers,
@@ -87,25 +87,44 @@ def generate_site_packages_yaml(
 def generate_site_packages_yaml_from_policy(policy: DerivedSitePolicy) -> str:
     data: Dict[str, object] = {"packages": {}}
 
-    for name in policy.requested_packages:
-        package_policy = policy.external_packages.get(name)
-        if package_policy is None:
-            data["packages"][name] = {"buildable": True}
-            continue
+    if policy.external_packages:
+        for name in policy.requested_packages:
+            package_policy = policy.external_packages.get(name)
+            if package_policy is None:
+                data["packages"][name] = {"buildable": True}
+                continue
 
-        if package_policy.spec is not None:
+            if package_policy.spec is not None:
+                data["packages"][name] = {
+                    "externals": [
+                        {
+                            "spec": package_policy.spec.spec,
+                            "prefix": package_policy.spec.prefix,
+                        }
+                    ],
+                    "buildable": package_policy.buildable,
+                }
+            else:
+                data["packages"][name] = {
+                    "buildable": package_policy.buildable,
+                }
+        return yaml.dump(data, sort_keys=False)
+
+    for name in policy.requested_packages:
+        spec = policy.packages.get(name)
+        if spec is not None:
             data["packages"][name] = {
                 "externals": [
                     {
-                        "spec": package_policy.spec.spec,
-                        "prefix": package_policy.spec.prefix,
+                        "spec": spec.spec,
+                        "prefix": spec.prefix,
                     }
                 ],
-                "buildable": package_policy.buildable,
+                "buildable": False,
             }
         else:
             data["packages"][name] = {
-                "buildable": package_policy.buildable,
+                "buildable": True,
             }
 
     return yaml.dump(data, sort_keys=False)

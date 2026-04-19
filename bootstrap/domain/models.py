@@ -8,6 +8,7 @@ SUPPORTED_SITE_LAYOUTS = ("spack-stack",)
 PolicySource = Literal["config", "detection", "policy", "override", "default", "legacy-compat"]
 PolicyConfidence = Literal["high", "medium", "low", "heuristic"]
 PolicyFieldKind = Literal["factual", "derived", "institutional", "template"]
+ExternalPackagePolicyStatus = Literal["validated-external", "unresolved"]
 
 AUTHORITY_PRECEDENCE: Dict[str, int] = {
     "legacy-compat": 0,
@@ -387,6 +388,42 @@ class PolicyAuthority:
 
 
 @dataclass(frozen=True)
+class ExternalPackagePolicy:
+    package: str
+    requested: bool
+    spec: Optional[PackageSpec]
+    buildable: bool
+    source: PolicySource
+    status: ExternalPackagePolicyStatus
+
+
+@dataclass(frozen=True)
+class ProviderPolicy:
+    providers: Dict[str, List[str]] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ModulePolicy:
+    backend: Optional[str]
+    common_enabled: List[str] = field(default_factory=list)
+    site_core_compilers: List[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class RuntimePolicy:
+    config: Optional[SiteRuntimeConfig]
+    overridden_fields: List[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class TemplatePolicy:
+    enabled: bool
+    name: Optional[str] = None
+    specs: List[str] = field(default_factory=list)
+    compiler: Optional[str] = None
+
+
+@dataclass(frozen=True)
 class DerivedSitePolicy:
     site: SiteConfig
     template: TemplateConfig
@@ -396,6 +433,11 @@ class DerivedSitePolicy:
     packages: Dict[str, PackageSpec]
     providers: Dict[str, List[str]] = field(default_factory=dict)
     common_modules_enabled: List[str] = field(default_factory=list)
+    external_packages: Dict[str, ExternalPackagePolicy] = field(default_factory=dict)
+    provider_policy: ProviderPolicy = field(default_factory=ProviderPolicy)
+    module_policy: ModulePolicy = field(default_factory=lambda: ModulePolicy(backend=None))
+    runtime_policy: Optional[RuntimePolicy] = None
+    template_policy: TemplatePolicy = field(default_factory=lambda: TemplatePolicy(enabled=False))
     authority: Dict[str, PolicyAuthority] = field(default_factory=dict)
 
 

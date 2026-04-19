@@ -1,6 +1,6 @@
 [project]
 name = "bootstrap-spack"
-version = "0.4.0"
+version = "0.4.1"
 description = "HPC external package detection and Spack bootstrap generator"
 authors = [
     { name = "João Gerd" }
@@ -10,6 +10,8 @@ requires-python = ">=3.10"
 
 dependencies = [
     "pyyaml>=6.0",
+    "archspec>=0.2.2",
+    "distro>=1.9.0",
 ]
 
 [project.optional-dependencies]

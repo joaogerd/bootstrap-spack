@@ -22,6 +22,7 @@ from bootstrap.domain.models import (
     SiteRuntimeConfig,
     TemplatePolicy,
 )
+from bootstrap.infrastructure.platform.detector import detect_platform_facts
 
 
 def derive_policy_providers(detected: Dict[str, DetectedPackage]) -> Dict[str, list[str]]:
@@ -55,6 +56,7 @@ def build_detected_host_facts(
         packages=dict(detected),
         linkage=dict(linkage),
         runtime=runtime_config,
+        platform_facts=detect_platform_facts(),
     )
 
 
@@ -117,15 +119,42 @@ def _apply_provider_overrides(config, providers: Dict[str, list[str]]) -> Dict[s
 
 
 
+def _derive_policy_operating_system(config, facts: DetectedHostFacts) -> tuple[Optional[str], PolicySource]:
+    override_value = config.site.policy_overrides.platform.operating_system
+    if override_value:
+        return override_value, "override"
+    if facts.platform_facts is not None:
+        return facts.platform_facts.operating_system, "detection"
+    if facts.compiler is not None and facts.compiler.operating_system:
+        return facts.compiler.operating_system, "legacy-compat"
+    return None, "default"
+
+
+
+def _derive_policy_target(config, facts: DetectedHostFacts) -> tuple[Optional[str], PolicySource]:
+    override_value = config.site.policy_overrides.platform.target
+    if override_value:
+        return override_value, "override"
+    if facts.platform_facts is not None:
+        return facts.platform_facts.target, "detection"
+    if facts.compiler is not None and facts.compiler.target:
+        return facts.compiler.target, "legacy-compat"
+    return None, "default"
+
+
+
 def _build_external_package_policy(
     requested_packages: List[str],
     specs: Dict[str, PackageSpec],
+    providers: Dict[str, list[str]],
 ) -> Dict[str, ExternalPackagePolicy]:
     policies: Dict[str, ExternalPackagePolicy] = {}
 
+    promoted_packages = {provider for items in providers.values() for provider in items}
+
     for name in requested_packages:
         spec = specs.get(name)
-        if spec is not None:
+        if spec is not None and name in promoted_packages:
             policies[name] = ExternalPackagePolicy(
                 package=name,
                 requested=True,
@@ -208,6 +237,10 @@ def _build_policy_authority(
     facts: DetectedHostFacts,
     providers: Dict[str, list[str]],
     runtime: Optional[SiteRuntimeConfig],
+    policy_operating_system: Optional[str],
+    policy_target: Optional[str],
+    policy_operating_system_source: PolicySource,
+    policy_target_source: PolicySource,
 ) -> Dict[str, PolicyAuthority]:
     authority: Dict[str, PolicyAuthority] = {}
     runtime_overrides = config.site.policy_overrides.runtime
@@ -228,6 +261,52 @@ def _build_policy_authority(
             source="detection",
             rationale="compiler entry inferred from active host toolchain",
             confidence="medium" if facts.platform_family in {"cray", "cluster"} else "high",
+        )
+
+    if policy_operating_system:
+        authority["platform.operating_system"] = _authority(
+            key="platform.operating_system",
+            value=policy_operating_system,
+            source=policy_operating_system_source,
+            rationale=(
+                "operating system forced by site.policy_overrides.platform.operating_system"
+                if policy_operating_system_source == "override"
+                else "derived from platform detector compatible with Spack operating-system normalization"
+            ),
+            confidence="high",
+            overridden_by=(
+                "site.policy_overrides.platform.operating_system"
+                if policy_operating_system_source == "override"
+                else None
+            ),
+            supersedes_source="detection" if policy_operating_system_source == "override" else None,
+            legacy_compat_used=policy_operating_system_source == "legacy-compat",
+            fallback_used=(
+                "compiler.operating_system"
+                if policy_operating_system_source == "legacy-compat"
+                else None
+            ),
+        )
+
+    if policy_target:
+        authority["platform.target"] = _authority(
+            key="platform.target",
+            value=policy_target,
+            source=policy_target_source,
+            rationale=(
+                "target forced by site.policy_overrides.platform.target"
+                if policy_target_source == "override"
+                else "derived from platform detector compatible with Spack target detection"
+            ),
+            confidence="high",
+            overridden_by=(
+                "site.policy_overrides.platform.target"
+                if policy_target_source == "override"
+                else None
+            ),
+            supersedes_source="detection" if policy_target_source == "override" else None,
+            legacy_compat_used=policy_target_source == "legacy-compat",
+            fallback_used="compiler.target" if policy_target_source == "legacy-compat" else None,
         )
 
     if runtime is not None:
@@ -355,8 +434,19 @@ def derive_site_policy(*, config, facts: DetectedHostFacts, specs: Dict[str, Pac
     common_modules_enabled = [config.site.module_system] if config.site.enabled else []
     providers = _apply_provider_overrides(config, derive_policy_providers(facts.packages))
     runtime = _apply_runtime_overrides(config, facts.runtime)
-    authority = _build_policy_authority(config=config, facts=facts, providers=providers, runtime=runtime)
-    external_packages = _build_external_package_policy(list(config.external_packages), specs)
+    policy_operating_system, policy_operating_system_source = _derive_policy_operating_system(config, facts)
+    policy_target, policy_target_source = _derive_policy_target(config, facts)
+    authority = _build_policy_authority(
+        config=config,
+        facts=facts,
+        providers=providers,
+        runtime=runtime,
+        policy_operating_system=policy_operating_system,
+        policy_target=policy_target,
+        policy_operating_system_source=policy_operating_system_source,
+        policy_target_source=policy_target_source,
+    )
+    external_packages = _build_external_package_policy(list(config.external_packages), specs, providers)
     provider_policy = _build_provider_policy(providers)
     module_policy = _build_module_policy(config, facts.compiler, common_modules_enabled)
     runtime_policy = _build_runtime_policy(config, runtime)
@@ -377,6 +467,9 @@ def derive_site_policy(*, config, facts: DetectedHostFacts, specs: Dict[str, Pac
         runtime_policy=runtime_policy,
         template_policy=template_policy,
         authority=authority,
+        policy_platform=facts.platform_facts.platform if facts.platform_facts is not None else None,
+        policy_operating_system=policy_operating_system,
+        policy_target=policy_target,
     )
 
 
@@ -424,6 +517,21 @@ def _build_trace_entries(*, config, facts: DetectedHostFacts, policy: DerivedSit
             confidence="medium",
         ),
     ]
+
+    if facts.platform_facts is not None:
+        entries.append(
+            _trace_entry(
+                (
+                    "detected platform facts="
+                    f"{facts.platform_facts.platform}-"
+                    f"{facts.platform_facts.operating_system}-"
+                    f"{facts.platform_facts.target}"
+                ),
+                source="detection",
+                rationale="platform facts detected independently from compiler metadata",
+                confidence="high",
+            )
+        )
 
     if facts.loaded_modules:
         entries.append(

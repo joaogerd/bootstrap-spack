@@ -81,10 +81,32 @@ def test_derive_site_policy_applies_controlled_overrides() -> None:
     trace = build_policy_trace(config=config, facts=facts, policy=policy, strict=False)
 
     assert policy.providers["mpi"] == ["mpich"]
+    assert policy.provider_policy.providers["mpi"] == ["mpich"]
+
     assert policy.runtime is not None
     assert policy.runtime.build_jobs == 16
     assert policy.runtime.install_tree_root == "/scratch/custom/opt/spack"
     assert policy.runtime.build_stage == ["/scratch/custom/stage"]
+
+    assert policy.runtime_policy is not None
+    assert policy.runtime_policy.config is not None
+    assert policy.runtime_policy.config.build_jobs == 16
+    assert "runtime.build_jobs" in policy.runtime_policy.overridden_fields
+    assert "runtime.install_tree_root" in policy.runtime_policy.overridden_fields
+
+    assert policy.module_policy.backend == "lmod"
+    assert policy.module_policy.common_enabled == ["lmod"]
+    assert policy.module_policy.site_core_compilers == ["gcc@11.4.0"]
+
+    assert policy.template_policy.enabled is True
+    assert policy.template_policy.name == "mpas-bundle"
+    assert policy.template_policy.specs == ["mpas-bundle"]
+    assert policy.template_policy.compiler == "gcc"
+
+    assert policy.external_packages["openmpi"].status == "validated-external"
+    assert policy.external_packages["openmpi"].buildable is False
+    assert policy.external_packages["openmpi"].spec is not None
+    assert policy.external_packages["openmpi"].spec.spec == "openmpi@4.1.1"
 
     assert policy.authority["providers.mpi"].source == "override"
     assert policy.authority["providers.mpi"].overridden_by == "site.policy_overrides.providers.mpi"

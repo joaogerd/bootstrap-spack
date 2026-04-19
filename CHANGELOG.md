@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.4.1] - 2026-04-19
+
+### Added
+
+- Explicit `PlatformFacts` model for detected platform, operating system and target facts
+- Independent platform detector under `bootstrap.infrastructure.platform.detector`
+- Controlled site policy overrides for:
+  - `site.policy_overrides.platform.operating_system`
+  - `site.policy_overrides.platform.target`
+- Policy fields on `DerivedSitePolicy` for:
+  - `policy_platform`
+  - `policy_operating_system`
+  - `policy_target`
+- Automated tests covering:
+  - Spack-compatible operating system normalization
+  - target derivation from `archspec`
+  - platform override semantics
+  - policy-driven rendering of `compilers.yaml`
+  - conservative external promotion in `packages.yaml`
+
+### Changed
+
+- `DetectedHostFacts` now carries explicit platform facts instead of relying only on compiler metadata
+- Policy derivation now prefers detected platform facts for `operating_system` and `target`
+- `compilers.yaml` rendering now uses final policy platform values instead of raw compiler fields as the final site truth
+- Site package externalization now defaults to a conservative promotion rule centered on the selected MPI provider
+- Project dependencies now include:
+  - `archspec`
+  - `distro`
+- Project version bumped to `0.4.1`
+
+### Fixed
+
+- Fixed incorrect operating system derivation that could leak values like `rhel8.4` into final site policy instead of normalized values like `rhel8`
+- Fixed incorrect target derivation that could leak generic values like `x86_64` into final site policy instead of detected architecture values such as `zen2`
+- Fixed architectural leakage where institutional target choices such as `core2` could be confused with detected hardware facts
+- Fixed policy/render coupling so `compilers.yaml` no longer treats the compiler entry itself as the final authority for site platform semantics
+- Reduced over-promotion of detected externals in site `packages.yaml`, improving compatibility with real `spack-stack` concretization workflows
+
+### Validation
+
+- Added automated tests for the platform bugfix line
+- Policy derivation and renderer behavior updated directly in the repository to reflect the 0.4.1 platform-facts model
+
 ## [0.4.0] - 2026-04-18
 
 ### Added

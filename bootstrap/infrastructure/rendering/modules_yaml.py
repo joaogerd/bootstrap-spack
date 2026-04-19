@@ -44,7 +44,13 @@ def generate_common_modules_yaml_from_policy(policy: DerivedSitePolicy) -> str:
 
 def generate_site_modules_yaml(module_system: str, core_compilers: List[str]) -> str:
     module_key = _normalized_module_key(module_system)
-    payload = {"modules": {"default": {}}}
+    payload = {
+        "modules": {
+            "default": {
+                "enable": [module_key],
+            }
+        }
+    }
 
     if module_key == "lmod":
         payload["modules"]["default"]["lmod"] = {

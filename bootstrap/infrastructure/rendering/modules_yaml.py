@@ -31,7 +31,7 @@ def generate_common_modules_yaml(module_system: str) -> str:
 
 
 def generate_common_modules_yaml_from_policy(policy: DerivedSitePolicy) -> str:
-    enabled = list(policy.common_modules_enabled)
+    enabled = list(policy.module_policy.common_enabled)
     payload = {
         "modules": {
             "default": {
@@ -62,11 +62,12 @@ def generate_site_modules_yaml(module_system: str, core_compilers: List[str]) ->
 
 
 def generate_site_modules_yaml_from_policy(policy: DerivedSitePolicy) -> str:
-    if policy.compiler is None:
+    backend = policy.module_policy.backend
+    if backend is None:
         return _dump_yaml({"modules": {"default": {}}})
 
-    core_compilers = list(policy.site.core_compilers) if policy.site.core_compilers else [policy.compiler.spec]
-    return generate_site_modules_yaml(policy.site.module_system, core_compilers)
+    core_compilers = list(policy.module_policy.site_core_compilers)
+    return generate_site_modules_yaml(backend, core_compilers)
 
 
 def generate_modules_yaml(module_system: str, core_compilers: List[str]) -> str:

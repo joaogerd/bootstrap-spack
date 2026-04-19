@@ -62,6 +62,8 @@ def sanitize_env(env: Dict[str, str]) -> Dict[str, str]:
     blocked_tokens = [
         "anaconda",
         "miniconda",
+        "miniforge",
+        "mambaforge",
         "conda",
         "/spack/",
         "/.spack/",

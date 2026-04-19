@@ -14,17 +14,9 @@ from bootstrap.infrastructure.rendering.packages_yaml import (
     generate_common_packages_yaml_from_policy,
     generate_site_packages_yaml_from_policy,
 )
-from bootstrap.infrastructure.rendering.template_spack_yaml import generate_template_spack_yaml
 
 
 def build_spack_stack_artifacts(*, policy: DerivedSitePolicy) -> LayeredSpackStackArtifacts:
-    template_spack_yaml = None
-    if policy.template.enabled:
-        template_spack_yaml = generate_template_spack_yaml(
-            policy.template.specs,
-            compiler=policy.template.compiler,
-        )
-
     return LayeredSpackStackArtifacts(
         common_packages_yaml=generate_common_packages_yaml_from_policy(policy),
         common_modules_yaml=generate_common_modules_yaml_from_policy(policy),
@@ -32,7 +24,7 @@ def build_spack_stack_artifacts(*, policy: DerivedSitePolicy) -> LayeredSpackSta
         site_compilers_yaml=generate_compilers_yaml_from_policy(policy),
         site_modules_yaml=generate_site_modules_yaml_from_policy(policy),
         site_config_yaml=generate_config_yaml_from_policy(policy),
-        template_spack_yaml=template_spack_yaml,
+        template_spack_yaml=None,
     )
 
 
@@ -43,20 +35,15 @@ def write_spack_stack_layout(
     artifacts: LayeredSpackStackArtifacts,
 ) -> Optional[str]:
     site = policy.site
-    template = policy.template
     if not site.enabled or not site.name:
         return None
 
     root = Path(output_root)
     common_dir = root / "configs" / "common"
     site_dir = root / "configs" / "sites" / site.name
-    template_name = template.name if template.name else None
-    template_dir = root / "configs" / "templates" / template_name if template_name else None
 
     common_dir.mkdir(parents=True, exist_ok=True)
     site_dir.mkdir(parents=True, exist_ok=True)
-    if template.enabled and template_dir is not None:
-        template_dir.mkdir(parents=True, exist_ok=True)
 
     (common_dir / "packages.yaml").write_text(artifacts.common_packages_yaml, encoding="utf-8")
     (common_dir / "modules.yaml").write_text(artifacts.common_modules_yaml, encoding="utf-8")
@@ -65,9 +52,6 @@ def write_spack_stack_layout(
     (site_dir / "compilers.yaml").write_text(artifacts.site_compilers_yaml, encoding="utf-8")
     (site_dir / "modules.yaml").write_text(artifacts.site_modules_yaml, encoding="utf-8")
     (site_dir / "config.yaml").write_text(artifacts.site_config_yaml, encoding="utf-8")
-
-    if template.enabled and template_dir is not None and artifacts.template_spack_yaml is not None:
-        (template_dir / "spack.yaml").write_text(artifacts.template_spack_yaml, encoding="utf-8")
 
     return str(site_dir)
 

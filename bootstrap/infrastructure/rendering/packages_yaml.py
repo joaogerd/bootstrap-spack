@@ -37,8 +37,9 @@ def _infer_mpi_provider(detected: Dict[str, DetectedPackage]) -> Optional[str]:
 
 
 def _promoted_external_names_from_policy(policy: DerivedSitePolicy) -> set[str]:
-    promoted = {provider for items in policy.providers.values() for provider in items}
-    return promoted
+    if policy.site.external_promotion_mode == "all":
+        return set(policy.requested_packages)
+    return {provider for items in policy.providers.values() for provider in items}
 
 
 def generate_common_packages_yaml(detected: Dict[str, DetectedPackage]) -> str:

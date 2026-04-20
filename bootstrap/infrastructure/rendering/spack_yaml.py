@@ -6,10 +6,11 @@ from bootstrap.domain.models import DerivedSitePolicy
 
 
 def generate_template_spack_yaml_from_policy(policy: DerivedSitePolicy) -> str:
-    specs: list[str] = []
-    compiler = policy.template_policy.compiler
+    template_specs = list(policy.template_policy.specs) if policy.template_policy.specs else list(policy.template.specs)
+    compiler = policy.template_policy.compiler or policy.template.compiler
 
-    for spec in policy.template_policy.specs:
+    specs: list[str] = []
+    for spec in template_specs:
         rendered = spec
         if compiler:
             rendered = f"{spec} %{compiler}"

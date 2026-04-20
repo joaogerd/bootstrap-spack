@@ -10,82 +10,48 @@
 
 ## Overview
 
-`bootstrap-spack` is a Python-based bootstrap utility for environments where scientific software is already available on the system and needs to be described cleanly for Spack.
+`bootstrap-spack` is a Python utility for environments where scientific software is already installed on the machine and needs to be described cleanly for Spack or for a layered `spack-stack`-style site layout.
 
-The project focuses on a common HPC problem:
+The project is built around a practical HPC problem:
 
-- external MPI, HDF5 and NetCDF installations already exist;
-- compiler and MPI wrappers differ across machines;
-- module systems behave differently on Linux, HPE and Cray-like platforms;
-- site maintainers need a repeatable way to generate `packages.yaml`, diagnostics and layered site configuration.
+- MPI, HDF5 and NetCDF are often already available on the system;
+- wrappers, compiler paths and module names differ from machine to machine;
+- the values that describe the host are not always the same values that should become institutional site policy;
+- maintainers need repeatable outputs instead of hand-written YAML files.
 
-Instead of manually writing everything by hand, `bootstrap-spack` inspects the host environment, validates candidate tools, reconstructs external package information, checks basic toolchain consistency and writes configuration outputs that can be reused in Spack or a spack-stack-style layout.
+Instead of manually building those files, `bootstrap-spack` inspects the host environment, validates candidate tools, reconstructs external package information, derives a site policy and writes inspectable YAML artifacts.
 
 ---
 
 ## Release status
 
-The current release line is **0.4.0**.
+The current release line is **0.4.1**.
 
-This release builds on the 0.3.0 architectural split and moves the project into its first **policy engineering** phase.
+This release closes an important platform-policy bugfix cycle on top of the 0.4.0 policy-engineering architecture.
 
-The tool now operates around explicit internal layers for:
+The 0.4.1 line adds three central improvements:
 
-- detected host facts;
-- derived site policy;
-- policy authority;
-- policy decision trace;
-- controlled policy overrides;
-- layered artifact generation.
+- explicit platform facts for detected `platform`, `operating_system` and `target`;
+- policy derivation that separates detected host facts from final site policy;
+- configurable site external promotion behavior for layered `packages.yaml` generation.
 
-In practical terms, the project now distinguishes more clearly between:
+In practical terms, the project now distinguishes clearly between:
 
-- what was observed on the host;
-- what was inferred as site policy;
-- which authority produced each important policy value;
-- why those policy decisions were taken;
-- which values were deliberately overridden;
-- what was rendered as final configuration files.
+- what was detected from the real machine;
+- what was selected as final policy for the generated site;
+- what was rendered into final YAML artifacts.
 
-The policy trace is no longer only a flat list of messages. It now supports structured trace entries that capture:
+This matters especially for fields such as:
 
-- decision message;
-- source of the decision;
-- rationale;
-- confidence level;
-- fallback used, when applicable.
-
-The derived policy model also carries explicit authority metadata for key decisions such as:
-
-- module backend selection;
-- compiler policy;
-- runtime policy;
-- MPI provider policy;
-- common module policy;
-- template enablement.
-
-### 0.4.0 release highlights
-
-The 0.4.0 line is considered closed as the first explicit **policy-engineering** release of the project.
-
-This release closes the transition from operational detection only into a policy-aware bootstrap workflow with:
-
-- explicit host-fact modeling;
-- explicit derived policy modeling;
-- explicit authority records for key policy fields;
-- structured trace entries for decision explainability;
-- controlled runtime and provider overrides;
-- baseline authority precedence for policy reporting;
-- authority-consistency warnings in the policy trace;
-- validation exercised on Linux, EGEON and JACI.
-
-In short, 0.4.0 is the release where the project stops being only a practical detector and becomes a semantically explicit bootstrap system.
+- `operating_system`
+- `target`
+- package external promotion into `configs/sites/<site>/packages.yaml`
 
 ---
 
 ## What the project does
 
-The current implementation provides four main capabilities.
+The current implementation provides five main capabilities.
 
 ### 1. External package detection
 
@@ -110,7 +76,24 @@ The tool can validate packages using:
 - dynamic linkage inspection via `ldd`
 - basic consistency checks across MPI / HDF5 / NetCDF relationships
 
-### 3. Spack output generation
+### 3. Explicit platform fact detection
+
+The project now detects platform facts independently from compiler metadata.
+
+This includes:
+
+- normalized platform name
+- normalized operating system
+- detected host target architecture
+
+Examples:
+
+- `rhel 8.4` → `rhel8`
+- `rocky 8.9` → `rocky8`
+- `ubuntu 22.04` → `ubuntu22.04`
+- `x86_64` host family resolved through `archspec` to targets such as `zen2`
+
+### 4. Unified Spack output generation
 
 The project generates a unified `packages.yaml` suitable for direct Spack use, including:
 
@@ -120,7 +103,7 @@ The project generates a unified `packages.yaml` suitable for direct Spack use, i
 
 It also writes a human-readable detection report for debugging and auditing.
 
-### 4. Layered spack-stack-style site generation
+### 5. Layered spack-stack-style site generation
 
 When site and template configuration are enabled, the tool generates a layered tree inspired by the `spack-stack` model:
 
@@ -141,24 +124,11 @@ When site and template configuration are enabled, the tool generates a layered t
         spack.yaml
 ```
 
-This lets the project represent:
+This allows the project to represent:
 
 - shared policy in `common`
-- machine-specific facts and settings in `sites/<site>`
+- machine-specific site policy in `sites/<site>`
 - environment intent in `templates/<template>`
-
----
-
-## Supported environment profiles
-
-The project has been shaped around practical execution on:
-
-- generic Linux workstations and laptops
-- cluster environments using Lmod or Environment Modules
-- Cray-like environments using `PrgEnv-*`, `cc`, `CC`, `ftn`
-- HPE / HPC environments that expose wrapper-based compiler and MPI toolchains
-
-Support is pragmatic and environment-driven. Some parts of the project are still heuristic by nature, especially compiler and toolchain inference.
 
 ---
 
@@ -174,17 +144,23 @@ For development tooling:
 pip install -e .[dev]
 ```
 
+The 0.4.1 line depends on:
+
+- `pyyaml`
+- `archspec`
+- `distro`
+
 ---
 
 ## Quick start
 
-### Generate a unified `packages.yaml`
+### Generate outputs using a site config
 
 ```bash
 bootstrap --config env/egeon.yaml --output-dir out --debug
 ```
 
-This writes, at minimum:
+This writes at least:
 
 ```text
 out/
@@ -192,13 +168,13 @@ out/
   detection-report.txt
 ```
 
-### Generate layered spack-stack-style outputs
+and, when `site` is enabled, also writes the layered tree under `out/configs/`.
+
+### Run the test suite
 
 ```bash
-bootstrap --config env/linux_spack_stack_site.yaml --output-dir out --debug
+pytest
 ```
-
-This writes the unified outputs and, when `site` is enabled, the layered site tree as well.
 
 ---
 
@@ -208,7 +184,7 @@ The bootstrap configuration is YAML-based.
 
 At a high level, the current model is organized around these sections:
 
-- `platform`: target platform profile such as `linux` or `cray`
+- `platform`: requested platform profile such as `linux`, `cluster` or `cray`
 - `modules`: base and optional modules to use during detection
 - `packages`: requested external packages to inspect
 - `validation`: strict or non-strict validation mode
@@ -242,19 +218,17 @@ output:
 ### Example with layered site generation
 
 ```yaml
-platform: cray
+platform: cluster
 
 modules:
   load:
-    - PrgEnv-gnu
-    - cray-mpich
-  optional:
-    - cray-netcdf
-    - cray-hdf5
+    - gnu9/9.4.0
+    - openmpi4/4.1.1
+  optional: []
 
 packages:
   external:
-    - mpich
+    - openmpi
     - hdf5
     - netcdf-c
     - netcdf-fortran
@@ -263,12 +237,13 @@ validation:
   strict: true
 
 site:
-  name: jaci
+  name: egeon
   layout: spack-stack
   module_system: lmod
   build_jobs: 8
+  external_promotion_mode: providers-only
   core_compilers:
-    - gcc
+    - gcc@9.4.0
 
 template:
   name: mpas-bundle
@@ -288,12 +263,15 @@ site:
   layout: spack-stack
   module_system: lmod
   build_jobs: 8
+  external_promotion_mode: providers-only
   core_compilers:
     - gcc@9.4.0
   policy_overrides:
     providers:
       mpi:
         - openmpi
+    platform:
+      target: core2
     runtime:
       build_jobs: 16
       install_tree_root: /scratch/site/spack/opt
@@ -308,9 +286,132 @@ These overrides are not applied silently. They become part of the derived policy
 
 ---
 
+## External promotion modes
+
+The layered site `packages.yaml` now supports an explicit promotion policy through:
+
+```yaml
+site:
+  external_promotion_mode: all
+```
+
+or:
+
+```yaml
+site:
+  external_promotion_mode: providers-only
+```
+
+### `all`
+
+Promotes all validated requested externals into `configs/sites/<site>/packages.yaml`.
+
+This is the more permissive and more traditional behavior.
+
+### `providers-only`
+
+Promotes only packages selected as important site providers, such as MPI.
+
+This is useful when you want a more conservative `spack-stack` site policy and prefer packages like HDF5 or NetCDF to remain buildable unless explicitly pinned later.
+
+---
+
+## Platform facts and policy semantics
+
+The 0.4.1 line fixes an important architectural ambiguity.
+
+The project now treats these as different things:
+
+### Detected platform facts
+
+Examples:
+
+- detected OS: `rhel8`
+- detected target: `zen2`
+
+These are facts about the host.
+
+### Final site policy
+
+Examples:
+
+- policy OS: `rhel8`
+- policy target: `core2`
+
+These are the values that may be rendered into final site artifacts.
+
+This means an institutional target such as `core2` is no longer confused with a detected hardware fact.
+
+---
+
+## Outputs
+
+### Unified outputs
+
+#### `packages.yaml`
+
+Generated for direct Spack use.
+
+Typical content includes:
+
+- external package specs
+- external prefixes
+- buildability policy
+- common provider hints when applicable
+
+#### `detection-report.txt`
+
+A human-readable report with:
+
+- package detection status
+- validation reasons
+- linkage information
+- generated specs
+- toolchain consistency summary
+- detected host facts
+- derived policy
+- policy authority
+- policy decision trace
+- structured trace entries for policy decisions
+- precedence metadata for authority records
+
+### Layered outputs
+
+When `site.name` is configured, the project additionally generates:
+
+#### `configs/common/packages.yaml`
+
+Shared package policy such as provider hints.
+
+#### `configs/common/modules.yaml`
+
+Shared module policy such as enabled module backend.
+
+#### `configs/sites/<site>/packages.yaml`
+
+Site-specific external package declarations according to `external_promotion_mode`.
+
+#### `configs/sites/<site>/compilers.yaml`
+
+Compiler entry rendered using final policy `operating_system` and `target` values.
+
+#### `configs/sites/<site>/modules.yaml`
+
+Site-specific module settings such as `core_compilers`.
+
+#### `configs/sites/<site>/config.yaml`
+
+Runtime-oriented configuration derived from host detection and policy overrides.
+
+#### `configs/templates/<template>/spack.yaml`
+
+A minimal template environment definition using the configured specs and optional compiler projection.
+
+---
+
 ## Internal architecture model
 
-The internal model is now organized around six semantic layers.
+The internal model is organized around six semantic layers.
 
 ### 1. Requested configuration
 
@@ -321,6 +422,7 @@ The internal model is now organized around six semantic layers.
 `DetectedHostFacts` represents what the host actually exposed, including:
 
 - platform family
+- explicit platform facts
 - loaded modules
 - optional module candidates
 - detected compiler entry
@@ -338,153 +440,19 @@ The internal model is now organized around six semantic layers.
 - runtime policy
 - common module policy
 - template intent
+- final platform policy values
 
 ### 4. Policy authority
 
 `PolicyAuthority` represents the authority that produced an important policy value.
 
-Each authority record captures:
-
-- `key`
-- `value`
-- `source`
-- `rationale`
-- `confidence`
-- `precedence_rank`
-- `fallback_used`
-- `overridden_by`
-- `supersedes_source`
-- `legacy_compat_used`
-
-This is the semantic layer that allows the tool to distinguish between values that came from configuration, detection, derived policy, explicit override, default behavior or legacy compatibility.
-
 ### 5. Policy decision trace
 
 `PolicyDecisionTrace` records why the policy looks the way it does.
 
-The trace now contains:
-
-- decision messages
-- warnings
-- assumptions
-- structured trace entries
-
-Each structured trace entry captures:
-
-- `message`
-- `source`
-- `rationale`
-- `confidence`
-- `fallback_used`
-
 ### 6. Rendered artifacts
 
-`LayeredSpackStackArtifacts` represents the materialized YAML outputs used to populate:
-
-- `common`
-- `site`
-- `template`
-
-This separation is important because it allows the tool to state more clearly what was detected automatically versus what was promoted to final site policy.
-
----
-
-## Policy authority precedence
-
-The 0.4.x line now models a baseline precedence order for important policy decisions.
-
-Current precedence ranks are:
-
-- `legacy-compat` → `0`
-- `default` → `100`
-- `policy` → `200`
-- `detection` → `300`
-- `config` → `400`
-- `override` → `500`
-
-This does not mean every field is decided the same way, but it gives the system an explicit normative order for authority reporting.
-
-In practical terms:
-
-- legacy compatibility should never win silently over newer semantics;
-- defaults are weaker than derived policy;
-- derived policy is weaker than observed detection when the field is evidence-driven;
-- configuration is stronger than inferred policy when the site declares a value directly;
-- explicit override is the strongest authority currently modeled.
-
-This precedence is now represented directly in `PolicyAuthority` and rendered in the detection report.
-
----
-
-## Outputs
-
-## Unified outputs
-
-### `packages.yaml`
-
-Generated for direct Spack use.
-
-Typical content includes:
-
-- external package specs
-- external prefixes
-- buildability policy
-- common provider hints when applicable
-
-### `detection-report.txt`
-
-A human-readable report with:
-
-- package detection status
-- validation reasons
-- linkage information
-- generated specs
-- toolchain consistency summary
-- detected host facts
-- derived policy
-- policy authority
-- policy decision trace
-- structured trace entries for policy decisions
-- precedence metadata for authority records
-
-## Layered outputs
-
-When `site.name` is configured, the project additionally generates:
-
-### `configs/common/packages.yaml`
-
-Shared package policy such as provider hints.
-
-### `configs/common/modules.yaml`
-
-Shared module policy such as enabled module backend.
-
-### `configs/sites/<site>/packages.yaml`
-
-Site-specific external package declarations.
-
-### `configs/sites/<site>/compilers.yaml`
-
-Detected compiler entry for the host environment.
-
-### `configs/sites/<site>/modules.yaml`
-
-Site-specific module settings such as `core_compilers`.
-
-### `configs/sites/<site>/config.yaml`
-
-Runtime-oriented configuration derived from host detection, such as:
-
-- build jobs
-- install tree root
-- build stage
-- test stage
-- source cache
-- misc cache
-
-### `configs/templates/<template>/spack.yaml`
-
-A minimal template environment definition using the configured specs and optional compiler projection.
+`LayeredSpackStackArtifacts` represents the materialized YAML outputs.
 
 ---
 
@@ -501,47 +469,11 @@ The project is organized around a layered internal architecture:
 Some design choices are deliberate:
 
 - detected facts and generated policy are kept separate as much as possible
-- policy authority is modeled explicitly rather than left implicit in helper behavior
+- platform facts are modeled explicitly instead of being inferred only from compiler metadata
 - override is treated as a formal authority layer rather than a silent mutation
-- platform-specific behavior is handled pragmatically rather than abstractly over-generalized
 - renderers are split by output artifact
 - the project favors inspectable YAML outputs over hidden implicit behavior
 - real-machine validation is treated as first-class feedback for the implementation
-
----
-
-## Current strengths
-
-The current implementation is strongest in these areas:
-
-- practical detection of external HPC libraries
-- wrapper-aware validation
-- Linux and Cray-like compiler detection paths
-- layered spack-stack-style output generation
-- transparent YAML artifacts that can be inspected and versioned
-- unit test coverage for the bootstrap core and renderer layer
-- explicit modeling of detected facts, derived policy and policy trace
-- explicit modeling of authority for important policy decisions
-- structured policy trace entries that make derivation decisions more auditable
-- controlled policy override handling for core runtime and MPI provider decisions
-- explicit precedence ranks for policy authority records
-
----
-
-## Current limitations
-
-This project is already useful, but it is still evolving.
-
-Important current limitations include:
-
-- compiler and toolchain inference still rely partly on heuristics
-- support is centered on a focused package set, not the full Spack ecosystem
-- layered output is a practical base for spack-stack-style layouts, not a complete replacement for the full upstream spack-stack project
-- some generated policy is still derived automatically from detected host facts, which may need manual refinement in institutional environments
-- module system behavior can remain site-specific and sometimes surprising on real HPC machines
-- provider selection and runtime policy remain pragmatic and are still being refined in the 0.4.x line
-- override handling is now part of the semantic model, but broader controlled override flows are still being expanded beyond the first central runtime/provider cases
-- precedence is now explicit, but field-specific authority rules are still being refined in the 0.4.x line
 
 ---
 
@@ -563,27 +495,11 @@ A practical way to interpret support maturity is:
 
 ---
 
-## Testing
+## Documentation
 
-Run the test suite with:
+A more practical usage manual is available at:
 
-```bash
-pytest
-```
-
-The project includes focused unit tests for:
-
-- spec generation
-- toolchain checks
-- patching of typed validation details
-- package registry behavior
-- package detection flow
-- YAML renderers
-- site tree generation
-- command runner behavior
-- configuration loading for layered site/template flows
-- bootstrap service integration
-- controlled override derivation semantics
+- `docs/user-manual.md`
 
 ---
 
@@ -596,22 +512,6 @@ ruff check .
 pytest
 mypy bootstrap
 ```
-
----
-
-## Roadmap direction
-
-The current direction of the project points toward:
-
-- stronger policy engineering in `DerivedSitePolicy`
-- richer and more explicit derivation rules
-- richer authority modeling and controlled override handling
-- more auditable decision traces with confidence and fallback reporting
-- stronger distinction between detected host facts and final institutional policy
-- more explicit platform profiles
-- broader package support and additional validation backends
-- stronger integration-style tests for real bootstrap flows
-- clearer field-specific authority rules on top of the baseline precedence model
 
 ---
 

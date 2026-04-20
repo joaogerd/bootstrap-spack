@@ -9,6 +9,7 @@ PolicySource = Literal["config", "detection", "policy", "override", "default", "
 PolicyConfidence = Literal["high", "medium", "low", "heuristic"]
 PolicyFieldKind = Literal["factual", "derived", "institutional", "template"]
 ExternalPackagePolicyStatus = Literal["validated-external", "unresolved"]
+ExternalPromotionMode = Literal["all", "providers-only"]
 
 AUTHORITY_PRECEDENCE: Dict[str, int] = {
     "legacy-compat": 0,
@@ -238,6 +239,7 @@ class SiteConfig:
     module_system: str = "lmod"
     build_jobs: int = 8
     core_compilers: List[str] = field(default_factory=list)
+    external_promotion_mode: ExternalPromotionMode = "all"
     policy_overrides: SitePolicyOverrides = field(default_factory=SitePolicyOverrides)
 
     @property

@@ -18,8 +18,11 @@ from bootstrap.infrastructure.rendering.spack_yaml import generate_template_spac
 
 
 def build_spack_stack_artifacts(*, policy: DerivedSitePolicy) -> LayeredSpackStackArtifacts:
+    template_enabled = policy.template_policy.enabled or policy.template.enabled
+    template_name = policy.template_policy.name or policy.template.name
+
     template_spack_yaml = None
-    if policy.template_policy.enabled and policy.template_policy.name:
+    if template_enabled and template_name:
         template_spack_yaml = generate_template_spack_yaml_from_policy(policy)
 
     return LayeredSpackStackArtifacts(
@@ -58,8 +61,9 @@ def write_spack_stack_layout(
     (site_dir / "modules.yaml").write_text(artifacts.site_modules_yaml, encoding="utf-8")
     (site_dir / "config.yaml").write_text(artifacts.site_config_yaml, encoding="utf-8")
 
-    if artifacts.template_spack_yaml and policy.template_policy.name:
-        template_dir = root / "configs" / "templates" / policy.template_policy.name
+    template_name = policy.template_policy.name or policy.template.name
+    if artifacts.template_spack_yaml and template_name:
+        template_dir = root / "configs" / "templates" / template_name
         template_dir.mkdir(parents=True, exist_ok=True)
         (template_dir / "spack.yaml").write_text(artifacts.template_spack_yaml, encoding="utf-8")
 

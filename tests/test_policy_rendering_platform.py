@@ -25,7 +25,7 @@ def _make_policy() -> DerivedSitePolicy:
     )
 
     return DerivedSitePolicy(
-        site=SiteConfig(name="egeon"),
+        site=SiteConfig(name="egeon", external_promotion_mode="providers-only"),
         template=TemplateConfig(),
         runtime=None,
         compiler=CompilerEntry(

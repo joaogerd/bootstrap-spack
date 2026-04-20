@@ -21,6 +21,7 @@ site:
   layout: spack-stack
   module_system: lmod
   build_jobs: 8
+  external_promotion_mode: providers-only
   core_compilers:
     - gcc@9.4.0
 

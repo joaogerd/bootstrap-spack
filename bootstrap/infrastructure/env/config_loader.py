@@ -16,6 +16,9 @@ from bootstrap.domain.models import (
 from bootstrap.shared.exceptions import ConfigError
 
 
+_ALLOWED_EXTERNAL_PROMOTION_MODES = {"all", "providers-only"}
+
+
 def _get(data: Dict[str, Any], path: list[str], default=None):
     current: Any = data
     for key in path:
@@ -130,6 +133,13 @@ def _load_site_config(raw: Dict[str, Any]) -> SiteConfig:
     if not isinstance(build_jobs, int) or build_jobs <= 0:
         raise ConfigError("site.build_jobs must be a positive integer")
 
+    external_promotion_mode = _get(raw, ["site", "external_promotion_mode"], "all")
+    if not isinstance(external_promotion_mode, str) or not external_promotion_mode.strip():
+        raise ConfigError("site.external_promotion_mode must be a non-empty string")
+    external_promotion_mode = external_promotion_mode.strip()
+    if external_promotion_mode not in _ALLOWED_EXTERNAL_PROMOTION_MODES:
+        raise ConfigError("site.external_promotion_mode must be one of ['all', 'providers-only']")
+
     core_compilers = _require_list("site.core_compilers", _get(raw, ["site", "core_compilers"], []))
 
     return SiteConfig(
@@ -138,6 +148,7 @@ def _load_site_config(raw: Dict[str, Any]) -> SiteConfig:
         module_system=module_system.strip(),
         build_jobs=build_jobs,
         core_compilers=core_compilers,
+        external_promotion_mode=external_promotion_mode,
         policy_overrides=_load_site_policy_overrides(raw),
     )
 

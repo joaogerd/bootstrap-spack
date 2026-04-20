@@ -4,7 +4,10 @@
 
 ### Added
 
-- Explicit `PlatformFacts` model for detected platform, operating system and target facts
+- Explicit `PlatformFacts` model for detected:
+  - platform
+  - operating system
+  - target
 - Independent platform detector under `bootstrap.infrastructure.platform.detector`
 - Controlled site policy overrides for:
   - `site.policy_overrides.platform.operating_system`
@@ -13,19 +16,28 @@
   - `policy_platform`
   - `policy_operating_system`
   - `policy_target`
+- Configurable site external promotion behavior through:
+  - `site.external_promotion_mode: all`
+  - `site.external_promotion_mode: providers-only`
+- Template renderer for `configs/templates/<template>/spack.yaml`
 - Automated tests covering:
   - Spack-compatible operating system normalization
   - target derivation from `archspec`
   - platform override semantics
   - policy-driven rendering of `compilers.yaml`
-  - conservative external promotion in `packages.yaml`
+  - configurable site external promotion behavior
 
 ### Changed
 
 - `DetectedHostFacts` now carries explicit platform facts instead of relying only on compiler metadata
 - Policy derivation now prefers detected platform facts for `operating_system` and `target`
 - `compilers.yaml` rendering now uses final policy platform values instead of raw compiler fields as the final site truth
-- Site package externalization now defaults to a conservative promotion rule centered on the selected MPI provider
+- Site `packages.yaml` promotion behavior is now policy-driven and configurable instead of fixed
+- The EGEON example configuration now uses conservative promotion explicitly through:
+  - `site.external_promotion_mode: providers-only`
+- `spack.yaml` template generation now correctly falls back to `template` configuration when `template_policy` is not explicitly populated
+- `README.md` was updated to reflect the real 0.4.1 behavior and configuration model
+- Added `docs/user-manual.md` with a practical usage guide
 - Project dependencies now include:
   - `archspec`
   - `distro`
@@ -37,12 +49,19 @@
 - Fixed incorrect target derivation that could leak generic values like `x86_64` into final site policy instead of detected architecture values such as `zen2`
 - Fixed architectural leakage where institutional target choices such as `core2` could be confused with detected hardware facts
 - Fixed policy/render coupling so `compilers.yaml` no longer treats the compiler entry itself as the final authority for site platform semantics
-- Reduced over-promotion of detected externals in site `packages.yaml`, improving compatibility with real `spack-stack` concretization workflows
+- Fixed regression where `configs/templates/<template>/spack.yaml` could stop being generated in layered site outputs
+- Fixed regression where the template renderer could emit an empty `specs` list when `DerivedSitePolicy` was built directly without an explicit `template_policy`
+- Fixed over-rigid external promotion behavior by making conservative `packages.yaml` promotion optional instead of mandatory
 
 ### Validation
 
-- Added automated tests for the platform bugfix line
-- Policy derivation and renderer behavior updated directly in the repository to reflect the 0.4.1 platform-facts model
+- Full automated test suite passing:
+  - `35 passed`
+- Verified layered output behavior with restored template generation
+- Verified EGEON output with:
+  - normalized `operating_system: rhel8`
+  - detected `target: zen2`
+  - conservative site `packages.yaml` when `external_promotion_mode: providers-only` is used
 
 ## [0.4.0] - 2026-04-18
 

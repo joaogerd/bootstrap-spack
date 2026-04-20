@@ -14,9 +14,14 @@ from bootstrap.infrastructure.rendering.packages_yaml import (
     generate_common_packages_yaml_from_policy,
     generate_site_packages_yaml_from_policy,
 )
+from bootstrap.infrastructure.rendering.spack_yaml import generate_template_spack_yaml_from_policy
 
 
 def build_spack_stack_artifacts(*, policy: DerivedSitePolicy) -> LayeredSpackStackArtifacts:
+    template_spack_yaml = None
+    if policy.template_policy.enabled and policy.template_policy.name:
+        template_spack_yaml = generate_template_spack_yaml_from_policy(policy)
+
     return LayeredSpackStackArtifacts(
         common_packages_yaml=generate_common_packages_yaml_from_policy(policy),
         common_modules_yaml=generate_common_modules_yaml_from_policy(policy),
@@ -24,7 +29,7 @@ def build_spack_stack_artifacts(*, policy: DerivedSitePolicy) -> LayeredSpackSta
         site_compilers_yaml=generate_compilers_yaml_from_policy(policy),
         site_modules_yaml=generate_site_modules_yaml_from_policy(policy),
         site_config_yaml=generate_config_yaml_from_policy(policy),
-        template_spack_yaml=None,
+        template_spack_yaml=template_spack_yaml,
     )
 
 
@@ -52,6 +57,11 @@ def write_spack_stack_layout(
     (site_dir / "compilers.yaml").write_text(artifacts.site_compilers_yaml, encoding="utf-8")
     (site_dir / "modules.yaml").write_text(artifacts.site_modules_yaml, encoding="utf-8")
     (site_dir / "config.yaml").write_text(artifacts.site_config_yaml, encoding="utf-8")
+
+    if artifacts.template_spack_yaml and policy.template_policy.name:
+        template_dir = root / "configs" / "templates" / policy.template_policy.name
+        template_dir.mkdir(parents=True, exist_ok=True)
+        (template_dir / "spack.yaml").write_text(artifacts.template_spack_yaml, encoding="utf-8")
 
     return str(site_dir)
 

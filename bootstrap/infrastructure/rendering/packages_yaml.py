@@ -36,6 +36,11 @@ def _infer_mpi_provider(detected: Dict[str, DetectedPackage]) -> Optional[str]:
     return None
 
 
+def _promoted_external_names_from_policy(policy: DerivedSitePolicy) -> set[str]:
+    promoted = {provider for items in policy.providers.values() for provider in items}
+    return promoted
+
+
 def generate_common_packages_yaml(detected: Dict[str, DetectedPackage]) -> str:
     data: Dict[str, object] = {"packages": {}}
     mpi_provider = _infer_mpi_provider(detected)
@@ -86,6 +91,7 @@ def generate_site_packages_yaml(
 
 def generate_site_packages_yaml_from_policy(policy: DerivedSitePolicy) -> str:
     data: Dict[str, object] = {"packages": {}}
+    promoted_names = _promoted_external_names_from_policy(policy)
 
     if policy.external_packages:
         for name in policy.requested_packages:
@@ -94,7 +100,7 @@ def generate_site_packages_yaml_from_policy(policy: DerivedSitePolicy) -> str:
                 data["packages"][name] = {"buildable": True}
                 continue
 
-            if package_policy.spec is not None:
+            if package_policy.spec is not None and name in promoted_names:
                 data["packages"][name] = {
                     "externals": [
                         {
@@ -106,13 +112,13 @@ def generate_site_packages_yaml_from_policy(policy: DerivedSitePolicy) -> str:
                 }
             else:
                 data["packages"][name] = {
-                    "buildable": package_policy.buildable,
+                    "buildable": True,
                 }
         return yaml.dump(data, sort_keys=False)
 
     for name in policy.requested_packages:
         spec = policy.packages.get(name)
-        if spec is not None:
+        if spec is not None and name in promoted_names:
             data["packages"][name] = {
                 "externals": [
                     {

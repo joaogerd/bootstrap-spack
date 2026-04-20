@@ -146,15 +146,12 @@ def _derive_policy_target(config, facts: DetectedHostFacts) -> tuple[Optional[st
 def _build_external_package_policy(
     requested_packages: List[str],
     specs: Dict[str, PackageSpec],
-    providers: Dict[str, list[str]],
 ) -> Dict[str, ExternalPackagePolicy]:
     policies: Dict[str, ExternalPackagePolicy] = {}
 
-    promoted_packages = {provider for items in providers.values() for provider in items}
-
     for name in requested_packages:
         spec = specs.get(name)
-        if spec is not None and name in promoted_packages:
+        if spec is not None:
             policies[name] = ExternalPackagePolicy(
                 package=name,
                 requested=True,
@@ -446,7 +443,7 @@ def derive_site_policy(*, config, facts: DetectedHostFacts, specs: Dict[str, Pac
         policy_operating_system_source=policy_operating_system_source,
         policy_target_source=policy_target_source,
     )
-    external_packages = _build_external_package_policy(list(config.external_packages), specs, providers)
+    external_packages = _build_external_package_policy(list(config.external_packages), specs)
     provider_policy = _build_provider_policy(providers)
     module_policy = _build_module_policy(config, facts.compiler, common_modules_enabled)
     runtime_policy = _build_runtime_policy(config, runtime)
